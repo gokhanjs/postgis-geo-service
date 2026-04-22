@@ -19,6 +19,7 @@ Konum tabanlı sorgular için geliştirilmiş, yüksek performanslı ve çok kir
 - [Önbellek (Cache)](#önbellek-cache)
 - [Migration Sistemi](#migration-sistemi)
 - [Postman Koleksiyonu](#postman-koleksiyonu)
+- [OSRM Yol Mesafesi](#osrm-yol-mesafesi)
 
 ---
 
@@ -138,6 +139,7 @@ Servis `http://0.0.0.0:3000` adresinde dinlemeye başlar.
 | `pnpm migrate:down` | Son migration'ı geri alır |
 | `pnpm generate:token` | Yeni admin token üretir, eskisini geçersiz kılar |
 | `pnpm generate:collection` | Tek kullanımlık Postman koleksiyonu indirme linki üretir |
+| `pnpm osrm:update` | OSRM harita verisini indirir, işler ve container'ı yeniden başlatır |
 
 ---
 
@@ -153,12 +155,16 @@ geo-service/
 │   ├── 003.do.create-api-keys.sql                # Proje API key tablosu
 │   ├── 003.undo.create-api-keys.sql
 │   ├── 004.do.create-admin-tokens.sql            # Admin token tablosu
-│   └── 004.undo.create-admin-tokens.sql
-├── server.js          # Ana uygulama — tüm endpoint'ler ve middleware
-├── migrate.js         # Migration runner
-├── generate-token.js  # Admin token üretici
+│   ├── 004.undo.create-admin-tokens.sql
+│   ├── 005.do.create-collection-tokens.sql       # Postman koleksiyon token tablosu
+│   └── 005.undo.create-collection-tokens.sql
+├── server.js             # Ana uygulama — tüm endpoint'ler ve middleware
+├── migrate.js            # Migration runner
+├── generate-token.js     # Admin token üretici
+├── generate-collection.js # Postman koleksiyon linki üretici
+├── osrm-update.js        # OSRM harita verisi güncelleme scripti
 ├── package.json
-├── .env               # Ortam değişkenleri (git'e gitmez)
+├── .env                  # Ortam değişkenleri (git'e gitmez)
 ├── .gitignore
 └── README.md
 ```
@@ -543,6 +549,57 @@ Belirtilen ID'ye sahip zone'u siler. Yalnızca key'e bağlı tenant'a ait zone'l
 
 ---
 
+#### `POST /api/v1/routing/distances` — Yol Mesafesi ve Sürüş Süresi
+
+> **OSRM gerektirir.** `OSRM_URL` tanımlı değilse `503` döner, diğer endpoint'ler etkilenmez.
+
+Bir origin noktasından entity listesine kadar **yol ağı üzerinden** mesafe (km) ve tahmini sürüş süresini (dakika) hesaplar.
+
+```json
+// İstek gövdesi
+{
+  "origin": { "lat": 47.2924, "lng": 11.0516 },
+  "destinations": [
+    { "entity_id": "42", "entity_type": "restaurant" },
+    { "entity_id": "17", "entity_type": "restaurant" }
+  ]
+}
+```
+
+| Alan | Tip | Zorunlu | Kural |
+|---|---|---|---|
+| `origin.lat` | number | Evet | -90 ile 90 |
+| `origin.lng` | number | Evet | -180 ile 180 |
+| `destinations` | array | Evet | 1–50 öğe |
+| `destinations[].entity_id` | string | Evet | — |
+| `destinations[].entity_type` | string | Evet | — |
+
+```json
+// Yanıt
+[
+  {
+    "entity_id": "42",
+    "entity_type": "restaurant",
+    "road_distance_km": 3.47,
+    "duration_min": 8.2
+  },
+  {
+    "entity_id": "17",
+    "entity_type": "restaurant",
+    "road_distance_km": 6.10,
+    "duration_min": 14.5
+  }
+]
+```
+
+OSRM ulaşılamaz durumdaysa `503` döner:
+
+```json
+{ "error": "Routing service unreachable", "osrm": "unreachable" }
+```
+
+---
+
 ---
 
 ## Konfigürasyon
@@ -560,6 +617,10 @@ Belirtilen ID'ye sahip zone'u siler. Yalnızca key'e bağlı tenant'a ait zone'l
 | `ALLOWED_IPS` | Hayır | İzin verilen IP adresleri (virgülle ayrılmış). Tanımlı değilse herkese açık. |
 | `TRUST_PROXY` | Hayır | `true` yapılırsa `X-Forwarded-For` başlığından gerçek IP okunur (varsayılan: `false`) |
 | `COLLECTION_TTL_MINUTES` | Hayır | Postman koleksiyon linkinin geçerlilik süresi (varsayılan: `60`) |
+| `OSRM_URL` | Hayır | OSRM sunucu adresi (örn. `http://localhost:5000`). Tanımlı değilse routing devre dışı. |
+| `OSRM_REGION` | Hayır | Harita bölgesi (`pnpm osrm:update` için, örn. `europe/austria`) |
+| `OSRM_DATA_PATH` | Hayır | OSRM veri dizini (`pnpm osrm:update` için, örn. `/opt/osrm/data`) |
+| `OSRM_CONTAINER_NAME` | Hayır | Docker container adı (varsayılan: `osrm-server`) |
 
 ### IP Kısıtlaması
 
@@ -739,6 +800,102 @@ Varsayılan geçerlilik süresi 60 dakikadır. `.env` dosyasına şu satırı ek
 ```env
 COLLECTION_TTL_MINUTES=30
 ```
+
+---
+
+## OSRM Yol Mesafesi
+
+OSRM (Open Source Routing Machine), OpenStreetMap verilerini kullanarak yol ağı üzerinden gerçek mesafe ve sürüş süresi hesaplar. Servis OSRM olmadan da tamamen çalışır; routing özelliği opsiyoneldir.
+
+### OSRM Nedir?
+
+- **Kuş uçuşu mesafe** → `ST_DistanceSphere` (PostGIS, her zaman aktif)
+- **Yol mesafesi + süre** → OSRM Table API (opsiyonel, Docker gerektirir)
+
+`OSRM_URL` tanımlı olmadığında `POST /api/v1/routing/distances` endpoint'i `503` döner; `/health` endpoint'i `"osrm": "disabled"` bilgisini verir. Diğer tüm endpoint'ler etkilenmez.
+
+### Sunucu Gereksinimleri
+
+| Bileşen | Minimum | Önerilen |
+|---|---|---|
+| RAM | 4 GB | 8 GB+ |
+| Disk | 5 GB (küçük bölge) | 50 GB+ (Avrupa) |
+| Docker | Kurulu olmalı | — |
+
+> Küçük bir ülke verisi (~500 MB PBF) işlenmiş halde ~2 GB disk kaplar.
+
+### Docker ile OSRM Kurulumu
+
+#### 1. Ortam Değişkenlerini Ayarla
+
+`.env` dosyasına ekle:
+
+```env
+OSRM_URL=http://localhost:5000
+OSRM_REGION=europe/austria
+OSRM_DATA_PATH=/opt/osrm/data
+OSRM_CONTAINER_NAME=osrm-server
+```
+
+#### 2. Harita Verisini İndir ve İşle
+
+```bash
+pnpm osrm:update
+```
+
+Bu komut sırayla şunları yapar:
+
+1. Geofabrik'ten bölgenin OSM PBF dosyasını indirir
+2. `osrm-extract` — yol ağını çıkarır
+3. `osrm-partition` — Multi-Level Dijkstra için bölümlere ayırır
+4. `osrm-customize` — ağırlık ve kısıtlamaları uygular
+5. OSRM container'ını yeniden başlatır
+
+İlk çalıştırmada container henüz yoksa komut başlatma talimatını ekrana yazar:
+
+```
+  docker run -d --name osrm-server --restart unless-stopped \
+    -p 5000:5000 -v "/opt/osrm/data:/data" \
+    ghcr.io/project-osrm/osrm-backend \
+    osrm-routed --algorithm mld /data/austria.osrm
+```
+
+#### 3. Sağlık Kontrolü
+
+```bash
+curl http://localhost:3000/health
+# { "status": "ok", "osrm": "ok" }
+```
+
+`osrm` değerleri: `"disabled"` (URL yok), `"ok"` (servis çalışıyor), `"unreachable"` (URL var ama cevap vermiyor).
+
+### Veri Güncelleme
+
+OpenStreetMap verileri sürekli değişir. Harita verisini güncel tutmak için:
+
+```bash
+pnpm osrm:update
+```
+
+Haftalık veya aylık çalıştırmak yeterlidir. Komut indir → işle → yeniden başlat akışını otomatik yönetir.
+
+### Bölge Örnekleri
+
+```env
+# Avusturya
+OSRM_REGION=europe/austria
+
+# Türkiye
+OSRM_REGION=europe/turkey
+
+# Almanya
+OSRM_REGION=europe/germany
+
+# Türkiye'nin belirli bir bölgesi (daha hızlı işlem)
+OSRM_REGION=europe/turkey/marmara-region-latest
+```
+
+Geçerli bölge listesi için: [download.geofabrik.de](https://download.geofabrik.de)
 
 ---
 

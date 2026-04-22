@@ -8,6 +8,34 @@ const { Pool }   = require('pg');
 const { LRUCache } = require('lru-cache');
 
 // ---------------------------------------------------------------------------
+// OSRM yardımcısı
+// OSRM_URL tanımlı değilse veya servis cevap vermiyorsa null döner (sessiz hata).
+// ---------------------------------------------------------------------------
+const OSRM_URL = process.env.OSRM_URL || null;
+
+async function queryOsrmTable(originLng, originLat, destinations) {
+  if (!OSRM_URL) return null;
+
+  // OSRM Table API: ilk koordinat origin (source=0), kalanlar destination
+  const coords = [
+    `${originLng},${originLat}`,
+    ...destinations.map((d) => `${d.lng},${d.lat}`),
+  ].join(';');
+
+  const url = `${OSRM_URL}/table/v1/driving/${coords}?sources=0&annotations=distance,duration`;
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.code !== 'Ok') return null;
+    return data; // { distances: [[...]], durations: [[...]] }
+  } catch {
+    return null; // servis kapalı veya timeout — sessizce geç
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 1. Env var doğrulaması
 // ---------------------------------------------------------------------------
 const REQUIRED_ENV = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME'];
@@ -141,7 +169,14 @@ const authenticateApiKey = async (request, reply) => {
 // ---------------------------------------------------------------------------
 app.get('/health', async () => {
   await pool.query('SELECT 1');
-  return { status: 'ok' };
+
+  let osrm = 'disabled';
+  if (OSRM_URL) {
+    const result = await queryOsrmTable(0, 0, [{ lng: 0, lat: 0 }]);
+    osrm = result !== null ? 'ok' : 'unreachable';
+  }
+
+  return { status: 'ok', osrm };
 });
 
 // ---------------------------------------------------------------------------
@@ -441,8 +476,97 @@ app.get('/api/v1/collection/download/:token', {
 
 
 // ---------------------------------------------------------------------------
-// 14. Graceful shutdown
+// 14. POST /api/v1/routing/distances
+// Entity ID listesine yol mesafesi + sürüş süresi ekler.
+// OSRM kapalıysa 503 döner — ana akışı bozmaz, ayrı çağrı olarak kullanılır.
 // ---------------------------------------------------------------------------
+app.post('/api/v1/routing/distances', {
+  preHandler: [authenticateApiKey],
+  schema: {
+    body: {
+      type: 'object',
+      required: ['origin', 'destinations'],
+      additionalProperties: false,
+      properties: {
+        origin: {
+          type: 'object',
+          required: ['lat', 'lng'],
+          additionalProperties: false,
+          properties: {
+            lat: { type: 'number', minimum: -90,  maximum: 90  },
+            lng: { type: 'number', minimum: -180, maximum: 180 },
+          },
+        },
+        destinations: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 50,
+          items: {
+            type: 'object',
+            required: ['entity_id', 'entity_type'],
+            additionalProperties: false,
+            properties: {
+              entity_id:   { type: 'string', minLength: 1 },
+              entity_type: { type: 'string', minLength: 1 },
+            },
+          },
+        },
+      },
+    },
+  },
+}, async (request, reply) => {
+  if (!OSRM_URL) {
+    return reply.code(503).send({ error: 'Routing service not configured', osrm: 'disabled' });
+  }
+
+  const { origin, destinations } = request.body;
+  const { tenant_id }            = request.tenantContext;
+
+  // DB'den entity koordinatlarını çek
+  const entityIds   = destinations.map((d) => d.entity_id);
+  const entityTypes = [...new Set(destinations.map((d) => d.entity_type))];
+
+  const { rows: locations } = await pool.query(`
+    SELECT entity_id, entity_type,
+           ST_X(location::geometry) AS lng,
+           ST_Y(location::geometry) AS lat
+    FROM   entity_locations
+    WHERE  tenant_id   = $1
+      AND  entity_id   = ANY($2)
+      AND  entity_type = ANY($3)
+      AND  is_active   = true
+  `, [tenant_id, entityIds, entityTypes]);
+
+  if (locations.length === 0) {
+    return [];
+  }
+
+  // Destination sırası: DB'den dönen sıraya göre
+  const osrmResult = await queryOsrmTable(origin.lng, origin.lat, locations);
+
+  if (!osrmResult) {
+    return reply.code(503).send({ error: 'Routing service unreachable', osrm: 'unreachable' });
+  }
+
+  const distances = osrmResult.distances[0]; // kaynak 0'dan tüm destinasyonlara
+  const durations = osrmResult.durations[0];
+
+  return locations.map((loc, i) => ({
+    entity_id:        loc.entity_id,
+    entity_type:      loc.entity_type,
+    road_distance_km: distances[i + 1] !== null
+      ? Math.round(distances[i + 1] / 10) / 100   // metre → km, 2 ondalık
+      : null,
+    duration_min:     durations[i + 1] !== null
+      ? Math.round(durations[i + 1] / 60 * 10) / 10  // saniye → dakika, 1 ondalık
+      : null,
+  }));
+});
+
+// ---------------------------------------------------------------------------
+// 15. Graceful shutdown
+// ---------------------------------------------------------------------------
+
 const shutdown = async (signal) => {
   app.log.info(`${signal} alındı, kapatılıyor...`);
   await app.close();
@@ -454,7 +578,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 
 // ---------------------------------------------------------------------------
-// 15. Başlat
+// 16. Başlat
 // ---------------------------------------------------------------------------
 const start = async () => {
   try {

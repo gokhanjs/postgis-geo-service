@@ -9,7 +9,8 @@
     "migrate": "node migrate.js up",
     "migrate:down": "node migrate.js down",
     "generate:token": "node generate-token.js",
-    "generate:collection": "node generate-collection.js"
+    "generate:collection": "node generate-collection.js",
+    "osrm:update": "node osrm-update.js"
   },
   "keywords": [],
   "author": "",
