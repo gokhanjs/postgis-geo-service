@@ -404,13 +404,36 @@ app.get('/api/v1/zones/check', {
         lat:         { type: 'number', minimum: -90,  maximum: 90  },
         lng:         { type: 'number', minimum: -180, maximum: 180 },
         entity_type: { type: 'string', minLength: 1 },
+        entity_id:   { type: 'string', minLength: 1 },
       },
     },
   },
-}, async (request) => {
-  const { lat, lng, entity_type } = request.query;
+}, async (request, reply) => {
+  const { lat, lng, entity_type, entity_id } = request.query;
   const { tenant_id } = request.tenantContext;
 
+  // Tekli kontrol: belirli bir entity'nin zone'u bu koordinatı kapsıyor mu?
+  if (entity_id !== undefined) {
+    const cacheKey = `zones:check:${entity_type}:${tenant_id}:${entity_id}:${lat}:${lng}`;
+    if (spatialCache.has(cacheKey)) return spatialCache.get(cacheKey);
+
+    const { rows } = await pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM zones
+        WHERE is_active   = true
+          AND entity_type = $1
+          AND tenant_id   = $2
+          AND entity_id   = $3
+          AND ST_Contains(zone, ST_SetSRID(ST_MakePoint($4, $5), 4326))
+      ) AS inside;
+    `, [entity_type, tenant_id, entity_id, lng, lat]);
+
+    const result = { inside: rows[0].inside };
+    setCacheWithIndex(entity_type, tenant_id, cacheKey, result);
+    return result;
+  }
+
+  // Toplu kontrol: bu koordinatı kapsayan tüm entity'leri getir
   const cacheKey = `zones:check:${entity_type}:${tenant_id}:${lat}:${lng}`;
   if (spatialCache.has(cacheKey)) return spatialCache.get(cacheKey);
 
