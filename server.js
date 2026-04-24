@@ -105,13 +105,13 @@ const cacheKeyIndex = new Map();
 
 function setCacheWithIndex(entityType, tenantId, key, value) {
   spatialCache.set(key, value);
-  const index = `${entityType}:${tenantId}`;
+  const index = `${entityType}\x00${tenantId}`;
   if (!cacheKeyIndex.has(index)) cacheKeyIndex.set(index, new Set());
   cacheKeyIndex.get(index).add(key);
 }
 
 function invalidateCache(entityType, tenantId) {
-  const index = `${entityType}:${tenantId}`;
+  const index = `${entityType}\x00${tenantId}`;
   const keys  = cacheKeyIndex.get(index);
   if (!keys) return;
   keys.forEach((key) => spatialCache.delete(key));
@@ -193,7 +193,7 @@ app.post('/api/v1/admin/keys', {
       additionalProperties: false,
       properties: {
         tenant_id:    { type: 'integer' },
-        project_name: { type: 'string', minLength: 1 },
+        project_name: { type: 'string', minLength: 1, maxLength: 200 },
       },
     },
   },
@@ -248,8 +248,8 @@ app.post('/api/v1/entities/sync', {
       required: ['entity_id', 'entity_type', 'lat', 'lng', 'is_active'],
       additionalProperties: false,
       properties: {
-        entity_id:   { type: 'string', minLength: 1 },
-        entity_type: { type: 'string', minLength: 1 },
+        entity_id:   { type: 'string', minLength: 1, maxLength: 100 },
+        entity_type: { type: 'string', minLength: 1, maxLength: 100 },
         lat:         { type: 'number', minimum: -90,  maximum: 90  },
         lng:         { type: 'number', minimum: -180, maximum: 180 },
         is_active:   { type: 'boolean' },
@@ -286,7 +286,7 @@ app.get('/api/v1/entities/nearby', {
       properties: {
         lat:         { type: 'number', minimum: -90,  maximum: 90   },
         lng:         { type: 'number', minimum: -180, maximum: 180  },
-        entity_type: { type: 'string', minLength: 1 },
+        entity_type: { type: 'string', minLength: 1, maxLength: 100 },
         radius_km:   { type: 'number', minimum: 0.1, maximum: 50, default: 5 },
       },
     },
@@ -295,7 +295,7 @@ app.get('/api/v1/entities/nearby', {
   const { lat, lng, entity_type, radius_km } = request.query;
   const { tenant_id } = request.tenantContext;
 
-  const cacheKey = `nearby:${entity_type}:${tenant_id}:${lat}:${lng}:${radius_km}`;
+  const cacheKey = `nearby\x00${entity_type}\x00${tenant_id}\x00${lat}\x00${lng}\x00${radius_km}`;
   if (spatialCache.has(cacheKey)) return spatialCache.get(cacheKey);
 
   const { rows } = await pool.query(`
@@ -333,8 +333,8 @@ app.post('/api/v1/zones/sync', {
       additionalProperties: false,
       properties: {
         id:          { type: 'integer' },
-        entity_id:   { type: 'string', minLength: 1 },
-        entity_type: { type: 'string', minLength: 1 },
+        entity_id:   { type: 'string', minLength: 1, maxLength: 100 },
+        entity_type: { type: 'string', minLength: 1, maxLength: 100 },
         geojson:     { type: 'object' },
         is_active:   { type: 'boolean' },
       },
@@ -346,6 +346,24 @@ app.post('/api/v1/zones/sync', {
 
   if (geojson.type !== 'Polygon') {
     return reply.code(400).send({ error: 'geojson.type must be "Polygon"' });
+  }
+
+  const coords = geojson.coordinates;
+  if (!Array.isArray(coords) || coords.length === 0) {
+    return reply.code(400).send({ error: 'geojson.coordinates must be a non-empty array' });
+  }
+  for (const ring of coords) {
+    if (!Array.isArray(ring) || ring.length < 4) {
+      return reply.code(400).send({ error: 'Each polygon ring must have at least 4 positions' });
+    }
+    for (const point of ring) {
+      if (!Array.isArray(point) || point.length < 2 ||
+          typeof point[0] !== 'number' || typeof point[1] !== 'number' ||
+          point[0] < -180 || point[0] > 180 ||
+          point[1] < -90  || point[1] > 90) {
+        return reply.code(400).send({ error: 'Each position must be [longitude, latitude] with valid bounds' });
+      }
+    }
   }
 
   await pool.query(`
@@ -403,8 +421,8 @@ app.get('/api/v1/zones/check', {
       properties: {
         lat:         { type: 'number', minimum: -90,  maximum: 90  },
         lng:         { type: 'number', minimum: -180, maximum: 180 },
-        entity_type: { type: 'string', minLength: 1 },
-        entity_id:   { type: 'string', minLength: 1 },
+        entity_type: { type: 'string', minLength: 1, maxLength: 100 },
+        entity_id:   { type: 'string', minLength: 1, maxLength: 100 },
       },
     },
   },
@@ -414,7 +432,7 @@ app.get('/api/v1/zones/check', {
 
   // Tekli kontrol: belirli bir entity'nin zone'u bu koordinatı kapsıyor mu?
   if (entity_id !== undefined) {
-    const cacheKey = `zones:check:${entity_type}:${tenant_id}:${entity_id}:${lat}:${lng}`;
+    const cacheKey = `zones:check\x00${entity_type}\x00${tenant_id}\x00${entity_id}\x00${lat}\x00${lng}`;
     if (spatialCache.has(cacheKey)) return spatialCache.get(cacheKey);
 
     const { rows } = await pool.query(`
@@ -434,7 +452,7 @@ app.get('/api/v1/zones/check', {
   }
 
   // Toplu kontrol: bu koordinatı kapsayan tüm entity'leri getir
-  const cacheKey = `zones:check:${entity_type}:${tenant_id}:${lat}:${lng}`;
+  const cacheKey = `zones:check\x00${entity_type}\x00${tenant_id}\x00${lat}\x00${lng}`;
   if (spatialCache.has(cacheKey)) return spatialCache.get(cacheKey);
 
   const { rows } = await pool.query(`
@@ -529,8 +547,8 @@ app.post('/api/v1/routing/distances', {
             required: ['entity_id', 'entity_type'],
             additionalProperties: false,
             properties: {
-              entity_id:   { type: 'string', minLength: 1 },
-              entity_type: { type: 'string', minLength: 1 },
+              entity_id:   { type: 'string', minLength: 1, maxLength: 100 },
+              entity_type: { type: 'string', minLength: 1, maxLength: 100 },
             },
           },
         },

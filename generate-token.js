@@ -12,10 +12,20 @@ const pool = new Pool({
 });
 
 async function generateToken() {
-  const token = `gat_${crypto.randomBytes(32).toString('hex')}`;
+  const token  = `gat_${crypto.randomBytes(32).toString('hex')}`;
+  const client = await pool.connect();
 
-  await pool.query('DELETE FROM admin_tokens');
-  await pool.query('INSERT INTO admin_tokens (token) VALUES ($1)', [token]);
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM admin_tokens');
+    await client.query('INSERT INTO admin_tokens (token) VALUES ($1)', [token]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 
   console.log('\n✓ Admin token oluşturuldu. Güvenli bir yere kaydedin, bir daha gösterilmeyecek:\n');
   console.log(`  ${token}\n`);
