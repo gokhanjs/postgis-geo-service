@@ -19,6 +19,10 @@ CREATE TABLE geofences (
 );
 
 CREATE INDEX geofences_lookup ON geofences
-    USING GIST (tenant_id, entity_type, area) WHERE is_active;
+    USING GIST (area, tenant_id, entity_type) WHERE is_active;
+
+CREATE TRIGGER geofences_touch
+  BEFORE UPDATE ON geofences
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON geofences TO geo_app;

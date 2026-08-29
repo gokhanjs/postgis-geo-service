@@ -104,3 +104,88 @@ describe('row-level security', () => {
     expect(rows).toEqual([{ is_active: true }]);
   });
 });
+
+/**
+ * Above proves the policies are right; this proves the application drives them
+ * right, through the real HTTP surface on every read path.
+ */
+describe('isolation through the running service', () => {
+  let server: import('../helpers/server.js').TestServer;
+  let keyA: string;
+  let keyB: string;
+
+  beforeAll(async () => {
+    const { startTestServer } = await import('../helpers/server.js');
+    server = await startTestServer();
+  });
+
+  afterAll(async () => {
+    await server?.stop();
+  });
+
+  beforeEach(async () => {
+    const { createApiKey, resetDatabase, squarePolygon } = await import('../helpers/fixtures.js');
+    await resetDatabase(server.pool);
+    keyA = await createApiKey(server.pool, 1, 'tenant-a');
+    keyB = await createApiKey(server.pool, 2, 'tenant-b');
+
+    await fetch(`${server.baseUrl}/api/v1/entities/restaurant/only-a`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-api-key': keyA },
+      body: JSON.stringify({ lat: 41.0, lng: 29.0, is_active: true }),
+    });
+    await fetch(`${server.baseUrl}/api/v1/geofences/1`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-api-key': keyA },
+      body: JSON.stringify({
+        entity_id: 'only-a',
+        entity_type: 'restaurant',
+        area: squarePolygon(29.0, 41.0),
+        is_active: true,
+      }),
+    });
+  });
+
+  const read = (path: string, key: string) =>
+    fetch(`${server.baseUrl}${path}`, { headers: { 'x-api-key': key } }).then((r) => r.json());
+
+  it('hides another tenant entity from proximity search', async () => {
+    const url = '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant';
+    expect(await read(url, keyA)).toMatchObject({ results: [{ entity_id: 'only-a' }] });
+    expect(await read(url, keyB)).toEqual({ results: [], next_cursor: null });
+  });
+
+  it('hides another tenant geofence from containment search', async () => {
+    const url = '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant';
+    expect(await read(url, keyA)).toEqual({ results: [{ entity_id: 'only-a' }] });
+    expect(await read(url, keyB)).toEqual({ results: [] });
+  });
+
+  it('hides another tenant geofence from the single-entity check', async () => {
+    const url =
+      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant&entity_id=only-a';
+    expect(await read(url, keyA)).toEqual({ inside: true });
+    expect(await read(url, keyB)).toEqual({ inside: false });
+  });
+
+  it('hides another tenant entity from routing lookups', async () => {
+    const body = {
+      origin: { lat: 41.0, lng: 29.0 },
+      destinations: [{ entity_id: 'only-a', entity_type: 'restaurant' }],
+    };
+    // Both answer 503; the point is neither reaches the other's coordinates.
+    for (const key of [keyA, keyB]) {
+      const res = await fetch(`${server.baseUrl}/api/v1/routing/distances`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(503);
+    }
+
+    const { rows } = await admin.query(
+      "SELECT tenant_id FROM entity_locations WHERE entity_id = 'only-a'",
+    );
+    expect(rows).toEqual([{ tenant_id: 1 }]);
+  });
+});

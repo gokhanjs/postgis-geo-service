@@ -54,9 +54,8 @@ export class EntityRepository {
         VALUES ($1, $2, $3, ST_Point($4, $5, 4326)::geography, $6)
         ON CONFLICT (entity_id, entity_type, tenant_id)
         DO UPDATE SET
-          location   = EXCLUDED.location,
-          is_active  = EXCLUDED.is_active,
-          updated_at = NOW();
+          location  = EXCLUDED.location,
+          is_active = EXCLUDED.is_active;
         `,
         [input.entityId, input.entityType, input.tenantId, input.lng, input.lat, input.isActive],
       );

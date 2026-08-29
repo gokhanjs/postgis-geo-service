@@ -14,7 +14,9 @@ const DB_CONFIG = {
   password: process.env.MIGRATION_DB_PASS ?? 'postgres',
 };
 
-const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
+const MIGRATIONS_DIR =
+  process.env.MIGRATIONS_DIR ??
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 
 const SAFE_DB_NAME = /^[a-zA-Z0-9_]+$/;
 

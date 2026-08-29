@@ -11,8 +11,21 @@ CREATE TABLE entity_locations (
     PRIMARY KEY (entity_id, entity_type, tenant_id)
 );
 
--- The only shape the read path asks for; the predicate keeps dead rows out.
+-- Geography leads: with scalars first, whether the spatial predicate reaches
+-- the index depends on row estimates, and on some distributions it does not.
 CREATE INDEX entity_locations_lookup ON entity_locations
-    USING GIST (tenant_id, entity_type, location) WHERE is_active;
+    USING GIST (location, tenant_id, entity_type) WHERE is_active;
+
+-- Owned here rather than by each write path, so it cannot be forgotten.
+CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER entity_locations_touch
+  BEFORE UPDATE ON entity_locations
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON entity_locations TO geo_app;

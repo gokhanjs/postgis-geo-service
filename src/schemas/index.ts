@@ -49,7 +49,12 @@ export const NearbyResponse = Type.Object({
 });
 
 export const GeofencePathParams = Type.Object({
-  id: Type.Integer({ description: "The geofence's identifier in the caller's own system." }),
+  // Beyond 2^53 JSON.parse collapses distinct values onto the same double.
+  id: Type.Integer({
+    minimum: 1,
+    maximum: Number.MAX_SAFE_INTEGER,
+    description: "The geofence's identifier in the caller's own system.",
+  }),
 });
 
 export const GeofenceBody = Type.Object(

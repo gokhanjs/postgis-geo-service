@@ -19,6 +19,48 @@ services:
       timeout: 5s
       retries: 12
 
+  # The service's own role is created by a migration, so the API cannot
+  # connect until this has run.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-geo_service}
+      DB_USER: ${DB_USER:-geo_app}
+      DB_PASS: ${DB_PASS:-geo_app}
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-postgres}
+      MIGRATION_DB_PASS: ${MIGRATION_DB_PASS:-postgres}
+      MIGRATIONS_DIR: /app/migrations
+    command: ['node', 'dist/scripts/migrate.js', 'up']
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-geo_service}
+      DB_USER: ${DB_USER:-geo_app}
+      DB_PASS: ${DB_PASS:-geo_app}
+      OSRM_URL: ${OSRM_URL:-}
+      PORT: 3000
+    ports:
+      - '${PORT:-3000}:3000'
+
   # Downloads and preprocesses an OSM extract. Runs once, then exits.
   # Reprocessing only happens when the .osrm files are missing from the volume.
   osrm-init:

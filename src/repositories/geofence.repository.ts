@@ -37,8 +37,7 @@ export class GeofenceRepository {
           entity_id   = EXCLUDED.entity_id,
           entity_type = EXCLUDED.entity_type,
           area        = EXCLUDED.area,
-          is_active   = EXCLUDED.is_active,
-          updated_at  = NOW();
+          is_active   = EXCLUDED.is_active;
         `,
         [
           input.externalId,
