@@ -12,6 +12,12 @@ export class HealthService {
     this.#osrmUrl = osrmUrl;
   }
 
+  /** Startup check: no OSRM probe, so a slow routing backend cannot hold the port shut. */
+  async checkDatabase(): Promise<void> {
+    await this.#health.ping();
+  }
+
+  /** Full check behind GET /health, including the optional routing backend. */
   async check(): Promise<{ status: 'ok'; osrm: OsrmStatus }> {
     await this.#health.ping();
 

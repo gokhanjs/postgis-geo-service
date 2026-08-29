@@ -3,18 +3,28 @@ import type { NearbyRow } from '../repositories/entity.repository.ts';
 import type { ZoneMatch } from '../repositories/zone.repository.ts';
 
 /**
- * Everything the spatial cache may hold. One store backs both read paths so a
- * write to a tenant's entities drops its zone answers too, which means the
- * value type has to span both shapes.
+ * One store backs both read paths so a write invalidates each. `kind` lets a
+ * reader confirm the shape rather than trusting key prefixes not to collide.
  */
-export type SpatialCacheValue = NearbyRow[] | ZoneMatch[] | { inside: boolean };
+export type SpatialCacheValue =
+  | { kind: 'nearby'; rows: NearbyRow[] }
+  | { kind: 'zoneMatches'; rows: ZoneMatch[] }
+  | { kind: 'zoneCheck'; inside: boolean };
 
 export type SpatialCache = TaggedCache<SpatialCacheValue>;
 
-/**
- * Groups every cached read that a write to (entityType, tenantId) invalidates.
- * NUL separates the parts so no combination of legal values can collide.
- */
+/** NUL separates the parts so no combination of legal values can collide. */
 export function cacheTag(entityType: string, tenantId: number): string {
   return `${entityType}\x00${tenantId}`;
+}
+
+/** Returns the entry only when it holds the expected shape. */
+export function readCached<K extends SpatialCacheValue['kind']>(
+  cache: SpatialCache,
+  key: string,
+  kind: K,
+): Extract<SpatialCacheValue, { kind: K }> | undefined {
+  const cached = cache.get(key);
+  if (cached === undefined || cached.kind !== kind) return undefined;
+  return cached as Extract<SpatialCacheValue, { kind: K }>;
 }

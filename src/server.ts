@@ -37,7 +37,7 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
 try {
-  await app.services.health.check();
+  await app.services.health.checkDatabase();
   app.log.info('Database connection established');
 
   const purged = await app.services.collections.purgeExpired();

@@ -4,7 +4,7 @@ import type {
   NearbyQuery,
   NearbyRow,
 } from '../repositories/entity.repository.ts';
-import { cacheTag, type SpatialCache } from './spatial-cache.ts';
+import { cacheTag, readCached, type SpatialCache } from './spatial-cache.ts';
 
 export class EntityService {
   readonly #entities: EntityRepository;
@@ -24,11 +24,11 @@ export class EntityService {
     const tag = cacheTag(query.entityType, query.tenantId);
     const key = `nearby\x00${tag}\x00${query.lat}\x00${query.lng}\x00${query.radiusKm}`;
 
-    const cached = this.#cache.get(key);
-    if (cached !== undefined) return cached as NearbyRow[];
+    const cached = readCached(this.#cache, key, 'nearby');
+    if (cached !== undefined) return cached.rows;
 
     const rows = await this.#entities.findNearby(query);
-    this.#cache.set(tag, key, rows);
+    this.#cache.set(tag, key, { kind: 'nearby', rows });
     return rows;
   }
 }

@@ -1,5 +1,4 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import type { PolygonGeoJson } from '../lib/geojson.ts';
 import { ZoneCheckQuery, ZoneIdParams, ZoneSyncBody } from '../schemas/index.ts';
 
 const zoneRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -14,7 +13,7 @@ const zoneRoutes: FastifyPluginAsyncTypebox = async (app) => {
         entityId: entity_id,
         entityType: entity_type,
         tenantId: request.tenant.tenant_id,
-        geojson: geojson as unknown as PolygonGeoJson,
+        geojson,
         isActive: is_active,
       });
 

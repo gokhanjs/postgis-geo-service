@@ -1,6 +1,16 @@
 import { validatePolygon } from '../lib/geojson.ts';
-import type { ZoneInput, ZoneMatch, ZoneRepository } from '../repositories/zone.repository.ts';
-import { cacheTag, type SpatialCache } from './spatial-cache.ts';
+import type { ZoneMatch, ZoneRepository } from '../repositories/zone.repository.ts';
+import { cacheTag, readCached, type SpatialCache } from './spatial-cache.ts';
+
+export interface ZoneSyncInput {
+  id: number;
+  entityId: string;
+  entityType: string;
+  tenantId: number;
+  /** Unvalidated client input; narrowed by validatePolygon before it is stored. */
+  geojson: unknown;
+  isActive: boolean;
+}
 
 export class ZoneService {
   readonly #zones: ZoneRepository;
@@ -12,11 +22,11 @@ export class ZoneService {
   }
 
   /** Returns a rejection reason, or null once the zone is stored. */
-  async sync(input: ZoneInput): Promise<string | null> {
-    const invalid = validatePolygon(input.geojson);
-    if (invalid !== null) return invalid;
+  async sync(input: ZoneSyncInput): Promise<string | null> {
+    const validation = validatePolygon(input.geojson);
+    if (!validation.ok) return validation.reason;
 
-    await this.#zones.upsert(input);
+    await this.#zones.upsert({ ...input, geojson: validation.polygon });
     this.#cache.invalidate(cacheTag(input.entityType, input.tenantId));
     return null;
   }
@@ -40,13 +50,12 @@ export class ZoneService {
     const tag = cacheTag(entityType, tenantId);
     const key = `zones:check\x00${tag}\x00${entityId}\x00${lat}\x00${lng}`;
 
-    const cached = this.#cache.get(key);
-    if (cached !== undefined) return cached as { inside: boolean };
+    const cached = readCached(this.#cache, key, 'zoneCheck');
+    if (cached !== undefined) return { inside: cached.inside };
 
     const inside = await this.#zones.coversPoint(tenantId, entityType, entityId, lng, lat);
-    const result = { inside };
-    this.#cache.set(tag, key, result);
-    return result;
+    this.#cache.set(tag, key, { kind: 'zoneCheck', inside });
+    return { inside };
   }
 
   async findCovering(
@@ -58,11 +67,11 @@ export class ZoneService {
     const tag = cacheTag(entityType, tenantId);
     const key = `zones:check\x00${tag}\x00${lat}\x00${lng}`;
 
-    const cached = this.#cache.get(key);
-    if (cached !== undefined) return cached as ZoneMatch[];
+    const cached = readCached(this.#cache, key, 'zoneMatches');
+    if (cached !== undefined) return cached.rows;
 
     const rows = await this.#zones.findCovering(tenantId, entityType, lng, lat);
-    this.#cache.set(tag, key, rows);
+    this.#cache.set(tag, key, { kind: 'zoneMatches', rows });
     return rows;
   }
 }

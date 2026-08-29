@@ -3,6 +3,9 @@ export interface PolygonGeoJson {
   coordinates: number[][][];
 }
 
+export type PolygonValidation =
+  { ok: true; polygon: PolygonGeoJson } | { ok: false; reason: string };
+
 const LNG_MIN = -180;
 const LNG_MAX = 180;
 const LAT_MIN = -90;
@@ -12,35 +15,38 @@ const LAT_MAX = 90;
 const MIN_RING_POSITIONS = 4;
 
 /**
- * Checks a GeoJSON Polygon far enough that PostGIS will accept it.
- *
- * Returns the reason it was rejected, or null when it passes. Messages are
- * surfaced to clients verbatim, so they name the offending rule rather than
- * the internal check.
+ * Validates a GeoJSON Polygon, returning the narrowed value so that passing
+ * this check is the only way to obtain a PolygonGeoJson. Reasons reach clients.
  */
-export function validatePolygon(geojson: unknown): string | null {
+export function validatePolygon(geojson: unknown): PolygonValidation {
   if (!isRecord(geojson) || geojson['type'] !== 'Polygon') {
-    return 'geojson.type must be "Polygon"';
+    return { ok: false, reason: 'geojson.type must be "Polygon"' };
   }
 
   const coordinates = geojson['coordinates'];
   if (!Array.isArray(coordinates) || coordinates.length === 0) {
-    return 'geojson.coordinates must be a non-empty array';
+    return { ok: false, reason: 'geojson.coordinates must be a non-empty array' };
   }
 
   for (const ring of coordinates) {
     if (!Array.isArray(ring) || ring.length < MIN_RING_POSITIONS) {
-      return `Each polygon ring must have at least ${MIN_RING_POSITIONS} positions`;
+      return {
+        ok: false,
+        reason: `Each polygon ring must have at least ${MIN_RING_POSITIONS} positions`,
+      };
     }
 
     for (const position of ring) {
       if (!isValidPosition(position)) {
-        return 'Each position must be [longitude, latitude] with valid bounds';
+        return {
+          ok: false,
+          reason: 'Each position must be [longitude, latitude] with valid bounds',
+        };
       }
     }
   }
 
-  return null;
+  return { ok: true, polygon: { type: 'Polygon', coordinates: coordinates as number[][][] } };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
