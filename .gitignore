@@ -3,8 +3,13 @@ node_modules/
 dist/
 coverage/
 
-# Local development workflow, not part of the project
+# Everything under .claude/ is local working state by default: session notes,
+# handoffs, plans, audit reports. Only the tooling meant for contributors is
+# re-included below, so anything a tool creates later is private unless it is
+# deliberately added here.
 .claude/*
 !.claude/agents/
 !.claude/commands/
+!.claude/skills/
 !.claude/settings.json
+.claude/settings.local.json

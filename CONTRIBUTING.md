@@ -35,6 +35,23 @@ CI runs exactly this against a PostGIS service container.
 
 `AGENTS.md` states the same rules for coding agents.
 
+## The `.claude/` directory
+
+It holds two different things, and `.gitignore` keeps them apart.
+
+Published, because contributors and coding agents use them: `agents/`,
+`commands/`, `skills/`, `settings.json`.
+
+Private, because it is one person's working state: session notes, handoffs,
+plans, audit reports, `settings.local.json`. Everything not on the allowlist is
+ignored, so a file a tool creates later is private by default rather than by
+someone remembering to add it.
+
+If you keep `.claude/` in a global gitignore, use `.claude/*` rather than
+`.claude/`. The directory form stops git descending at all, which silently
+kills the allowlist above and makes the published files look committed when
+they are not.
+
 ## Commits
 
 Conventional Commits, English, imperative subject. The body should explain why
