@@ -12,6 +12,11 @@
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
 
+    // Node runs the TypeScript sources directly, which requires real .ts
+    // specifiers; these two let tsc accept them and rewrite them to .js on emit.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+
     "allowJs": true,
     "checkJs": false,
     "resolveJsonModule": true,

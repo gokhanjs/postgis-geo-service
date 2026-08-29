@@ -27,7 +27,7 @@ export default async function globalSetup(): Promise<void> {
     await pool.end();
   }
 
-  await run('node', ['migrate.js', 'up'], {
+  await run('node', ['scripts/migrate.ts', 'up'], {
     env: { ...process.env, ...testDbEnv },
   });
 }

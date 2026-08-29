@@ -55,7 +55,7 @@ export async function startTestServer(extraEnv: Record<string, string> = {}): Pr
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  const child = spawn('node', ['server.js'], {
+  const child = spawn('node', ['src/server.ts'], {
     env: { ...process.env, ...testDbEnv, PORT: String(port), ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
