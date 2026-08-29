@@ -1,0 +1,2 @@
+REVOKE USAGE ON SCHEMA public FROM geo_app;
+DROP ROLE IF EXISTS geo_app;

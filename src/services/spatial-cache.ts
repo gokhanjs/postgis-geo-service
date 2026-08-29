@@ -1,6 +1,6 @@
 import type { TaggedCache } from '../lib/tagged-cache.ts';
 import type { NearbyRow } from '../repositories/entity.repository.ts';
-import type { ZoneMatch } from '../repositories/zone.repository.ts';
+import type { GeofenceMatch } from '../repositories/geofence.repository.ts';
 
 /**
  * One store backs both read paths so a write invalidates each. `kind` lets a
@@ -8,8 +8,8 @@ import type { ZoneMatch } from '../repositories/zone.repository.ts';
  */
 export type SpatialCacheValue =
   | { kind: 'nearby'; rows: NearbyRow[] }
-  | { kind: 'zoneMatches'; rows: ZoneMatch[] }
-  | { kind: 'zoneCheck'; inside: boolean };
+  | { kind: 'geofenceMatches'; rows: GeofenceMatch[] }
+  | { kind: 'geofenceCheck'; inside: boolean };
 
 export type SpatialCache = TaggedCache<SpatialCacheValue>;
 

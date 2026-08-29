@@ -9,7 +9,7 @@ import collectionRoutes from './routes/collection.ts';
 import entityRoutes from './routes/entities.ts';
 import healthRoutes from './routes/health.ts';
 import routingRoutes from './routes/routing.ts';
-import zoneRoutes from './routes/zones.ts';
+import geofenceRoutes from './routes/geofences.ts';
 
 export interface BuildAppOptions {
   logger?: boolean;
@@ -34,7 +34,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(healthRoutes);
   await app.register(adminRoutes);
   await app.register(entityRoutes);
-  await app.register(zoneRoutes);
+  await app.register(geofenceRoutes);
   await app.register(routingRoutes);
   await app.register(collectionRoutes);
 

@@ -1,19 +1,19 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ZoneCheckQuery, ZoneIdParams, ZoneSyncBody } from '../schemas/index.ts';
 
-const zoneRoutes: FastifyPluginAsyncTypebox = async (app) => {
+const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.post(
     '/api/v1/zones/sync',
     { preHandler: [app.authenticateApiKey], schema: { body: ZoneSyncBody } },
     async (request, reply) => {
       const { id, entity_id, entity_type, geojson, is_active } = request.body;
 
-      const rejection = await app.services.zones.sync({
-        id,
+      const rejection = await app.services.geofences.sync({
+        externalId: id,
         entityId: entity_id,
         entityType: entity_type,
         tenantId: request.tenant.tenant_id,
-        geojson,
+        area: geojson,
         isActive: is_active,
       });
 
@@ -27,7 +27,10 @@ const zoneRoutes: FastifyPluginAsyncTypebox = async (app) => {
     '/api/v1/zones/:id',
     { preHandler: [app.authenticateApiKey], schema: { params: ZoneIdParams } },
     async (request, reply) => {
-      const deleted = await app.services.zones.delete(request.params.id, request.tenant.tenant_id);
+      const deleted = await app.services.geofences.delete(
+        request.params.id,
+        request.tenant.tenant_id,
+      );
 
       if (!deleted) return reply.code(404).send({ error: 'Zone not found' });
 
@@ -45,12 +48,12 @@ const zoneRoutes: FastifyPluginAsyncTypebox = async (app) => {
       // With an entity named, the caller is asking about that one zone;
       // without, about every zone of that type covering the point.
       if (entity_id !== undefined) {
-        return app.services.zones.isInside(tenantId, entity_type, entity_id, lng, lat);
+        return app.services.geofences.isInside(tenantId, entity_type, entity_id, lng, lat);
       }
 
-      return app.services.zones.findCovering(tenantId, entity_type, lng, lat);
+      return app.services.geofences.findCovering(tenantId, entity_type, lng, lat);
     },
   );
 };
 
-export default zoneRoutes;
+export default geofenceRoutes;

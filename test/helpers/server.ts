@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { Pool } from 'pg';
-import { poolConfig, testDbEnv } from './env.js';
+import { adminPoolConfig, testDbEnv } from './env.js';
 
 export interface TestServer {
   baseUrl: string;
@@ -73,7 +73,7 @@ export async function startTestServer(extraEnv: Record<string, string> = {}): Pr
     });
   }
 
-  const pool = new Pool(poolConfig);
+  const pool = new Pool(adminPoolConfig);
 
   return {
     baseUrl,

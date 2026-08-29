@@ -32,10 +32,14 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASS: postgres
       DB_NAME: geo_service_test
       TEST_DB_NAME: geo_service_test
+      # The suite drives the service as the restricted role and asserts what it
+      # cannot reach, so both sets of credentials have to be present.
+      DB_USER: geo_app
+      DB_PASS: geo_app
+      MIGRATION_DB_USER: postgres
+      MIGRATION_DB_PASS: postgres
 
     steps:
       - uses: actions/checkout@v4
@@ -48,13 +52,6 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      # Service containers skip the image's init scripts, so the extensions the
-      # local compose setup installs have to be created explicitly here.
-      - name: Enable PostGIS extensions
-        run: |
-          psql "postgresql://postgres:postgres@127.0.0.1:5432/geo_service_test" \
-            -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS btree_gist;"
 
       - run: pnpm typecheck
       - run: pnpm lint

@@ -5,18 +5,18 @@ import { CollectionRepository } from './repositories/collection.repository.ts';
 import { CredentialRepository } from './repositories/credential.repository.ts';
 import { EntityRepository } from './repositories/entity.repository.ts';
 import { HealthRepository } from './repositories/health.repository.ts';
-import { ZoneRepository } from './repositories/zone.repository.ts';
+import { GeofenceRepository } from './repositories/geofence.repository.ts';
 import { CollectionService } from './services/collection.service.ts';
 import { CredentialService } from './services/credential.service.ts';
 import { EntityService } from './services/entity.service.ts';
 import { HealthService } from './services/health.service.ts';
 import { RoutingService } from './services/routing.service.ts';
 import type { SpatialCacheValue } from './services/spatial-cache.ts';
-import { ZoneService } from './services/zone.service.ts';
+import { GeofenceService } from './services/geofence.service.ts';
 
 export interface Services {
   entities: EntityService;
-  zones: ZoneService;
+  geofences: GeofenceService;
   credentials: CredentialService;
   routing: RoutingService;
   collections: CollectionService;
@@ -36,7 +36,7 @@ export function buildServices(pool: Pool, config: Config): Services {
 
   return {
     entities: new EntityService(entityRepository, spatialCache),
-    zones: new ZoneService(new ZoneRepository(pool), spatialCache),
+    geofences: new GeofenceService(new GeofenceRepository(pool), spatialCache),
     credentials: new CredentialService(new CredentialRepository(pool)),
     routing: new RoutingService(entityRepository, config.osrmUrl),
     collections: new CollectionService(new CollectionRepository(pool)),

@@ -4,11 +4,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+// Migrations run as an owner/superuser: they create extensions, roles and
+// policies. The service itself connects as the restricted role created in 002,
+// which is the only way row-level security applies to it at all.
 const DB_CONFIG = {
   host: process.env.DB_HOST,
   port: Number.parseInt(process.env.DB_PORT ?? '5432', 10),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS ?? '',
+  user: process.env.MIGRATION_DB_USER ?? 'postgres',
+  password: process.env.MIGRATION_DB_PASS ?? 'postgres',
 };
 
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
