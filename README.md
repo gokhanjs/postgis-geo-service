@@ -25,18 +25,18 @@ Konum tabanlı sorgular için geliştirilmiş, yüksek performanslı ve çok kir
 
 ## Teknoloji Yığını
 
-| Katman | Teknoloji | Açıklama |
-|---|---|---|
-| Çalışma ortamı | Node.js 22+ | JavaScript çalışma ortamı |
-| Web framework | Fastify 5 | Express'e kıyasla ~2-3x daha hızlı HTTP framework |
-| Veritabanı sürücüsü | pg (node-postgres) | PostgreSQL bağlantısı ve connection pool yönetimi |
-| Spatial veritabanı | PostgreSQL + PostGIS | Geometrik veri tipleri ve coğrafi sorgular |
-| Güvenlik | @fastify/helmet | HTTP güvenlik başlıkları |
-| Hız sınırlama | @fastify/rate-limit | İstek hızı sınırlandırma |
-| Önbellek | lru-cache | Bellekte LRU tabanlı sorgu önbelleği |
-| Konfigürasyon | dotenv | Ortam değişkenleri yönetimi |
-| Geliştirme | nodemon | Dosya değişikliğinde otomatik yeniden başlatma |
-| Paket yöneticisi | pnpm | Disk ve hız açısından npm'den verimli |
+| Katman              | Teknoloji            | Açıklama                                          |
+| ------------------- | -------------------- | ------------------------------------------------- |
+| Çalışma ortamı      | Node.js 22+          | JavaScript çalışma ortamı                         |
+| Web framework       | Fastify 5            | Express'e kıyasla ~2-3x daha hızlı HTTP framework |
+| Veritabanı sürücüsü | pg (node-postgres)   | PostgreSQL bağlantısı ve connection pool yönetimi |
+| Spatial veritabanı  | PostgreSQL + PostGIS | Geometrik veri tipleri ve coğrafi sorgular        |
+| Güvenlik            | @fastify/helmet      | HTTP güvenlik başlıkları                          |
+| Hız sınırlama       | @fastify/rate-limit  | İstek hızı sınırlandırma                          |
+| Önbellek            | lru-cache            | Bellekte LRU tabanlı sorgu önbelleği              |
+| Konfigürasyon       | dotenv               | Ortam değişkenleri yönetimi                       |
+| Geliştirme          | nodemon              | Dosya değişikliğinde otomatik yeniden başlatma    |
+| Paket yöneticisi    | pnpm                 | Disk ve hız açısından npm'den verimli             |
 
 ---
 
@@ -103,6 +103,7 @@ pnpm migrate
 ```
 
 Bu komut şunları otomatik yapar:
+
 - `.env`'deki `DB_NAME` yoksa veritabanını oluşturur
 - PostGIS eklentisini aktif eder
 - Tüm tabloları ve indeksleri sırayla oluşturur
@@ -131,15 +132,15 @@ Servis `http://0.0.0.0:3000` adresinde dinlemeye başlar.
 
 ## Komutlar
 
-| Komut | Açıklama |
-|---|---|
-| `pnpm start` | Servisi başlatır (üretim modu) |
-| `pnpm dev` | Servisi nodemon ile başlatır (geliştirme modu) |
-| `pnpm migrate` | Bekleyen tüm migration'ları sırayla uygular |
-| `pnpm migrate:down` | Son migration'ı geri alır |
-| `pnpm generate:token` | Yeni admin token üretir, eskisini geçersiz kılar |
-| `pnpm generate:collection` | Tek kullanımlık Postman koleksiyonu indirme linki üretir |
-| `pnpm osrm:update` | OSRM harita verisini indirir, işler ve container'ı yeniden başlatır |
+| Komut                      | Açıklama                                                            |
+| -------------------------- | ------------------------------------------------------------------- |
+| `pnpm start`               | Servisi başlatır (üretim modu)                                      |
+| `pnpm dev`                 | Servisi nodemon ile başlatır (geliştirme modu)                      |
+| `pnpm migrate`             | Bekleyen tüm migration'ları sırayla uygular                         |
+| `pnpm migrate:down`        | Son migration'ı geri alır                                           |
+| `pnpm generate:token`      | Yeni admin token üretir, eskisini geçersiz kılar                    |
+| `pnpm generate:collection` | Tek kullanımlık Postman koleksiyonu indirme linki üretir            |
+| `pnpm osrm:update`         | OSRM harita verisini indirir, işler ve container'ı yeniden başlatır |
 
 ---
 
@@ -174,62 +175,68 @@ geo-service/
 ## Veritabanı Şeması
 
 ### `entity_locations`
+
 Herhangi bir nesnenin (restoran, depo, sürücü vb.) nokta konumunu saklar.
 
-| Kolon | Tip | Açıklama |
-|---|---|---|
-| `entity_id` | TEXT | Nesnenin dış sistemdeki ID'si |
-| `entity_type` | TEXT | Nesne tipi (`restaurant`, `driver`, `warehouse` vb.) |
-| `tenant_id` | INT | Hangi projeye ait olduğu |
-| `location` | GEOMETRY(Point, 4326) | WGS84 koordinat sistemiyle nokta |
-| `is_active` | BOOLEAN | Aktif/pasif durumu |
+| Kolon         | Tip                   | Açıklama                                             |
+| ------------- | --------------------- | ---------------------------------------------------- |
+| `entity_id`   | TEXT                  | Nesnenin dış sistemdeki ID'si                        |
+| `entity_type` | TEXT                  | Nesne tipi (`restaurant`, `driver`, `warehouse` vb.) |
+| `tenant_id`   | INT                   | Hangi projeye ait olduğu                             |
+| `location`    | GEOMETRY(Point, 4326) | WGS84 koordinat sistemiyle nokta                     |
+| `is_active`   | BOOLEAN               | Aktif/pasif durumu                                   |
 
 **Primary key:** `(entity_id, entity_type, tenant_id)` — aynı ID farklı tipler için kullanılabilir.
 
 **İndeksler:**
+
 - `idx_entity_location` — GIST (spatial sorgu hızlandırması)
 - `idx_entity_tenant` — B-tree `(tenant_id, entity_type)`
 
 ---
 
 ### `zones`
+
 Herhangi bir nesnenin polygon kapsama alanını saklar (teslimat bölgesi, servis alanı, geofence vb.).
 
-| Kolon | Tip | Açıklama |
-|---|---|---|
-| `id` | BIGINT | Dış sistemdeki zone ID'si (primary key) |
-| `entity_id` | TEXT | Hangi nesneye ait |
-| `entity_type` | TEXT | Nesne tipi |
-| `tenant_id` | INT | Hangi projeye ait |
-| `zone` | GEOMETRY(Polygon, 4326) | WGS84 Polygon geometrisi |
-| `is_active` | BOOLEAN | Aktif/pasif durumu |
+| Kolon         | Tip                     | Açıklama                                |
+| ------------- | ----------------------- | --------------------------------------- |
+| `id`          | BIGINT                  | Dış sistemdeki zone ID'si (primary key) |
+| `entity_id`   | TEXT                    | Hangi nesneye ait                       |
+| `entity_type` | TEXT                    | Nesne tipi                              |
+| `tenant_id`   | INT                     | Hangi projeye ait                       |
+| `zone`        | GEOMETRY(Polygon, 4326) | WGS84 Polygon geometrisi                |
+| `is_active`   | BOOLEAN                 | Aktif/pasif durumu                      |
 
 **İndeksler:**
+
 - `idx_zone_geometry` — GIST (spatial sorgu hızlandırması)
 - `idx_zone_entity` — B-tree `(entity_id, entity_type, tenant_id)`
 
 ---
 
 ### `api_keys`
+
 Proje başına API anahtarlarını saklar.
 
-| Kolon | Tip | Açıklama |
-|---|---|---|
-| `key` | TEXT | `gsk_` önekli anahtar (primary key) |
-| `tenant_id` | INT | Bu key'e bağlı tenant |
-| `project_name` | TEXT | Projenin adı (tanımlayıcı) |
-| `is_active` | BOOLEAN | Aktif/iptal durumu |
-| `created_at` | TIMESTAMPTZ | Oluşturulma zamanı |
+| Kolon          | Tip         | Açıklama                            |
+| -------------- | ----------- | ----------------------------------- |
+| `key`          | TEXT        | `gsk_` önekli anahtar (primary key) |
+| `tenant_id`    | INT         | Bu key'e bağlı tenant               |
+| `project_name` | TEXT        | Projenin adı (tanımlayıcı)          |
+| `is_active`    | BOOLEAN     | Aktif/iptal durumu                  |
+| `created_at`   | TIMESTAMPTZ | Oluşturulma zamanı                  |
 
 ---
 
 ### `admin_tokens`
+
 Admin işlemleri için kullanılan token'ları saklar. Sadece bir aktif token bulunur.
 
-| Kolon | Tip | Açıklama |
-|---|---|---|
-| `token` | TEXT | `gat_` önekli token (primary key) |
-| `created_at` | TIMESTAMPTZ | Oluşturulma zamanı |
+| Kolon        | Tip         | Açıklama                          |
+| ------------ | ----------- | --------------------------------- |
+| `token`      | TEXT        | `gat_` önekli token (primary key) |
+| `created_at` | TIMESTAMPTZ | Oluşturulma zamanı                |
 
 ---
 
@@ -290,8 +297,8 @@ Zone senkronizasyonunda beklenen format:
   "coordinates": [
     [
       [28.9784, 41.0082],
-      [29.0300, 41.0200],
-      [29.0500, 41.0000],
+      [29.03, 41.02],
+      [29.05, 41.0],
       [28.9784, 41.0082]
     ]
   ]
@@ -361,6 +368,7 @@ Proje B  →  gsk_bbb...  →  tenant_id: 2  →  sadece tenant 2 verisi
 Servis ve veritabanı sağlık kontrolü. Auth gerektirmez.
 
 **Yanıt:**
+
 ```json
 { "status": "ok" }
 ```
@@ -443,13 +451,13 @@ Bir nesnenin nokta konumunu ekler veya günceller. Aynı `(entity_id, entity_typ
 }
 ```
 
-| Alan | Tip | Zorunlu | Kural |
-|---|---|---|---|
-| `entity_id` | string | Evet | Min 1 karakter |
-| `entity_type` | string | Evet | Min 1 karakter |
-| `lat` | number | Evet | -90 ile 90 arası |
-| `lng` | number | Evet | -180 ile 180 arası |
-| `is_active` | boolean | Evet | — |
+| Alan          | Tip     | Zorunlu | Kural              |
+| ------------- | ------- | ------- | ------------------ |
+| `entity_id`   | string  | Evet    | Min 1 karakter     |
+| `entity_type` | string  | Evet    | Min 1 karakter     |
+| `lat`         | number  | Evet    | -90 ile 90 arası   |
+| `lng`         | number  | Evet    | -180 ile 180 arası |
+| `is_active`   | boolean | Evet    | —                  |
 
 ```json
 // Yanıt
@@ -464,12 +472,12 @@ Verilen koordinata belirtilen yarıçap içindeki aktif nesneleri mesafeye göre
 
 **Query parametreleri:**
 
-| Parametre | Tip | Zorunlu | Varsayılan | Kural |
-|---|---|---|---|---|
-| `lat` | number | Evet | — | -90 ile 90 |
-| `lng` | number | Evet | — | -180 ile 180 |
-| `entity_type` | string | Evet | — | — |
-| `radius_km` | number | Hayır | `5` | 0.1 ile 50 arası |
+| Parametre     | Tip    | Zorunlu | Varsayılan | Kural            |
+| ------------- | ------ | ------- | ---------- | ---------------- |
+| `lat`         | number | Evet    | —          | -90 ile 90       |
+| `lng`         | number | Evet    | —          | -180 ile 180     |
+| `entity_type` | string | Evet    | —          | —                |
+| `radius_km`   | number | Hayır   | `5`        | 0.1 ile 50 arası |
 
 ```json
 // Yanıt
@@ -493,19 +501,26 @@ Bir nesneye ait polygon kapsama alanını ekler veya günceller. `id` dış sist
   "entity_type": "restaurant",
   "geojson": {
     "type": "Polygon",
-    "coordinates": [[[10.98, 47.29], [11.05, 47.26], [11.05, 47.29], [10.98, 47.29]]]
+    "coordinates": [
+      [
+        [10.98, 47.29],
+        [11.05, 47.26],
+        [11.05, 47.29],
+        [10.98, 47.29]
+      ]
+    ]
   },
   "is_active": true
 }
 ```
 
-| Alan | Tip | Zorunlu | Kural |
-|---|---|---|---|
-| `id` | integer | Evet | Dış sistem zone ID'si |
-| `entity_id` | string | Evet | — |
-| `entity_type` | string | Evet | — |
-| `geojson` | object | Evet | `type: "Polygon"` zorunlu |
-| `is_active` | boolean | Evet | — |
+| Alan          | Tip     | Zorunlu | Kural                     |
+| ------------- | ------- | ------- | ------------------------- |
+| `id`          | integer | Evet    | Dış sistem zone ID'si     |
+| `entity_id`   | string  | Evet    | —                         |
+| `entity_type` | string  | Evet    | —                         |
+| `geojson`     | object  | Evet    | `type: "Polygon"` zorunlu |
+| `is_active`   | boolean | Evet    | —                         |
 
 ```json
 // Yanıt
@@ -516,22 +531,19 @@ Bir nesneye ait polygon kapsama alanını ekler veya günceller. `id` dış sist
 
 #### `GET /api/v1/zones/check` — Zone Kapsama Kontrolü
 
-Verilen koordinatı kapsayan zone'lara sahip nesneleri döner. Kullanım senaryosu: *"Bu adrese hangi restoranlar teslimat yapar?"*
+Verilen koordinatı kapsayan zone'lara sahip nesneleri döner. Kullanım senaryosu: _"Bu adrese hangi restoranlar teslimat yapar?"_
 
 **Query parametreleri:**
 
-| Parametre | Tip | Zorunlu |
-|---|---|---|
-| `lat` | number | Evet |
-| `lng` | number | Evet |
-| `entity_type` | string | Evet |
+| Parametre     | Tip    | Zorunlu |
+| ------------- | ------ | ------- |
+| `lat`         | number | Evet    |
+| `lng`         | number | Evet    |
+| `entity_type` | string | Evet    |
 
 ```json
 // Yanıt
-[
-  { "entity_id": "2" },
-  { "entity_id": "7" }
-]
+[{ "entity_id": "2" }, { "entity_id": "7" }]
 ```
 
 Boş array döndüğünde o koordinat hiçbir zone tarafından kapsanmıyor demektir.
@@ -566,13 +578,13 @@ Bir origin noktasından entity listesine kadar **yol ağı üzerinden** mesafe (
 }
 ```
 
-| Alan | Tip | Zorunlu | Kural |
-|---|---|---|---|
-| `origin.lat` | number | Evet | -90 ile 90 |
-| `origin.lng` | number | Evet | -180 ile 180 |
-| `destinations` | array | Evet | 1–50 öğe |
-| `destinations[].entity_id` | string | Evet | — |
-| `destinations[].entity_type` | string | Evet | — |
+| Alan                         | Tip    | Zorunlu | Kural        |
+| ---------------------------- | ------ | ------- | ------------ |
+| `origin.lat`                 | number | Evet    | -90 ile 90   |
+| `origin.lng`                 | number | Evet    | -180 ile 180 |
+| `destinations`               | array  | Evet    | 1–50 öğe     |
+| `destinations[].entity_id`   | string | Evet    | —            |
+| `destinations[].entity_type` | string | Evet    | —            |
 
 ```json
 // Yanıt
@@ -586,7 +598,7 @@ Bir origin noktasından entity listesine kadar **yol ağı üzerinden** mesafe (
   {
     "entity_id": "17",
     "entity_type": "restaurant",
-    "road_distance_km": 6.10,
+    "road_distance_km": 6.1,
     "duration_min": 14.5
   }
 ]
@@ -606,21 +618,21 @@ OSRM ulaşılamaz durumdaysa `503` döner:
 
 ### Ortam Değişkenleri (`.env`)
 
-| Değişken | Zorunlu | Açıklama |
-|---|---|---|
-| `PORT` | Hayır | Dinlenecek port (varsayılan: `3000`) |
-| `DB_HOST` | Evet | PostgreSQL sunucu adresi |
-| `DB_PORT` | Evet | PostgreSQL port (genellikle `5432`) |
-| `DB_USER` | Evet | Veritabanı kullanıcısı |
-| `DB_PASS` | Hayır | Veritabanı şifresi (boş bırakılabilir) |
-| `DB_NAME` | Evet | Veritabanı adı |
-| `ALLOWED_IPS` | Hayır | İzin verilen IP adresleri (virgülle ayrılmış). Tanımlı değilse herkese açık. |
-| `TRUST_PROXY` | Hayır | `true` yapılırsa `X-Forwarded-For` başlığından gerçek IP okunur (varsayılan: `false`) |
-| `COLLECTION_TTL_MINUTES` | Hayır | Postman koleksiyon linkinin geçerlilik süresi (varsayılan: `60`) |
-| `OSRM_URL` | Hayır | OSRM sunucu adresi (örn. `http://localhost:5000`). Tanımlı değilse routing devre dışı. |
-| `OSRM_REGION` | Hayır | Harita bölgesi (`pnpm osrm:update` için, örn. `europe/austria`) |
-| `OSRM_DATA_PATH` | Hayır | OSRM veri dizini (`pnpm osrm:update` için, örn. `/opt/osrm/data`) |
-| `OSRM_CONTAINER_NAME` | Hayır | Docker container adı (varsayılan: `osrm-server`) |
+| Değişken                 | Zorunlu | Açıklama                                                                               |
+| ------------------------ | ------- | -------------------------------------------------------------------------------------- |
+| `PORT`                   | Hayır   | Dinlenecek port (varsayılan: `3000`)                                                   |
+| `DB_HOST`                | Evet    | PostgreSQL sunucu adresi                                                               |
+| `DB_PORT`                | Evet    | PostgreSQL port (genellikle `5432`)                                                    |
+| `DB_USER`                | Evet    | Veritabanı kullanıcısı                                                                 |
+| `DB_PASS`                | Hayır   | Veritabanı şifresi (boş bırakılabilir)                                                 |
+| `DB_NAME`                | Evet    | Veritabanı adı                                                                         |
+| `ALLOWED_IPS`            | Hayır   | İzin verilen IP adresleri (virgülle ayrılmış). Tanımlı değilse herkese açık.           |
+| `TRUST_PROXY`            | Hayır   | `true` yapılırsa `X-Forwarded-For` başlığından gerçek IP okunur (varsayılan: `false`)  |
+| `COLLECTION_TTL_MINUTES` | Hayır   | Postman koleksiyon linkinin geçerlilik süresi (varsayılan: `60`)                       |
+| `OSRM_URL`               | Hayır   | OSRM sunucu adresi (örn. `http://localhost:5000`). Tanımlı değilse routing devre dışı. |
+| `OSRM_REGION`            | Hayır   | Harita bölgesi (`pnpm osrm:update` için, örn. `europe/austria`)                        |
+| `OSRM_DATA_PATH`         | Hayır   | OSRM veri dizini (`pnpm osrm:update` için, örn. `/opt/osrm/data`)                      |
+| `OSRM_CONTAINER_NAME`    | Hayır   | Docker container adı (varsayılan: `osrm-server`)                                       |
 
 ### IP Kısıtlaması
 
@@ -663,7 +675,7 @@ TRUST_PROXY=true
 
 ```js
 app.register(rateLimit, {
-  max: 100,        // Pencere başına maksimum istek sayısı
+  max: 100, // Pencere başına maksimum istek sayısı
   timeWindow: 60000, // Pencere süresi (ms) — 60000 = 1 dakika
 });
 ```
@@ -676,8 +688,8 @@ Değiştirmek için bu iki satırı düzenleyin. Örneğin dakikada 200 istek i�
 
 ```js
 const pool = new Pool({
-  max: 10,                    // Maksimum eş zamanlı bağlantı sayısı
-  idleTimeoutMillis: 30000,   // Boştaki bağlantının kapatılma süresi (ms)
+  max: 10, // Maksimum eş zamanlı bağlantı sayısı
+  idleTimeoutMillis: 30000, // Boştaki bağlantının kapatılma süresi (ms)
   connectionTimeoutMillis: 5000, // Bağlantı kurulamazsa timeout (ms)
 });
 ```
@@ -688,7 +700,7 @@ const pool = new Pool({
 
 ```js
 const spatialCache = new LRUCache({ max: 500, ttl: 1000 * 60 * 5 }); // Spatial sorgular: 5 dakika
-const apiKeyCache  = new LRUCache({ max: 200, ttl: 1000 * 60 * 5 }); // API key doğrulama: 5 dakika
+const apiKeyCache = new LRUCache({ max: 200, ttl: 1000 * 60 * 5 }); // API key doğrulama: 5 dakika
 const adminTokenCache = new LRUCache({ max: 10, ttl: 1000 * 60 * 5 }); // Admin token: 5 dakika
 ```
 
@@ -703,6 +715,7 @@ const adminTokenCache = new LRUCache({ max: 10, ttl: 1000 * 60 * 5 }); // Admin 
 Spatial sorgular (`nearby`, `zones/check`) aynı parametrelerle tekrar geldiğinde veritabanına gidilmez; sonuç önbellekten döndürülür.
 
 Önbellek anahtarı şu parametrelerin birleşiminden oluşur:
+
 - `entity_type`
 - `tenant_id`
 - `lat`, `lng`
@@ -711,6 +724,7 @@ Spatial sorgular (`nearby`, `zones/check`) aynı parametrelerle tekrar geldiğin
 ### Akıllı İptal
 
 `entities/sync` veya `zones/sync` çağrıldığında:
+
 - Tüm önbellek temizlenmez
 - Yalnızca **ilgili `(entity_type, tenant_id)` çiftine ait** önbellek kayıtları silinir
 - Diğer tenant'ların ve diğer entity tiplerinin önbelleği etkilenmez
@@ -787,11 +801,11 @@ Link indirme sonrasında veya süresi dolunca (`expires_at`) geçersiz hale geli
 1. Postman → **Import** → İndirilen `.json` dosyasını sürükle
 2. **Environment** oluştur, şu değişkenleri tanımla:
 
-| Değişken | Değer |
-|---|---|
-| `base_url` | `http://localhost:3000` |
-| `api_key` | `gsk_...` |
-| `admin_token` | `gat_...` |
+| Değişken      | Değer                   |
+| ------------- | ----------------------- |
+| `base_url`    | `http://localhost:3000` |
+| `api_key`     | `gsk_...`               |
+| `admin_token` | `gat_...`               |
 
 ### TTL Ayarı
 
@@ -816,11 +830,11 @@ OSRM (Open Source Routing Machine), OpenStreetMap verilerini kullanarak yol ağ�
 
 ### Sunucu Gereksinimleri
 
-| Bileşen | Minimum | Önerilen |
-|---|---|---|
-| RAM | 4 GB | 8 GB+ |
-| Disk | 5 GB (küçük bölge) | 50 GB+ (Avrupa) |
-| Docker | Kurulu olmalı | — |
+| Bileşen | Minimum            | Önerilen        |
+| ------- | ------------------ | --------------- |
+| RAM     | 4 GB               | 8 GB+           |
+| Disk    | 5 GB (küçük bölge) | 50 GB+ (Avrupa) |
+| Docker  | Kurulu olmalı      | —               |
 
 > Küçük bir ülke verisi (~500 MB PBF) işlenmiş halde ~2 GB disk kaplar.
 

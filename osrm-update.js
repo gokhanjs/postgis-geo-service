@@ -1,12 +1,12 @@
 require('dotenv').config();
 
 const { execSync } = require('child_process');
-const fs            = require('fs');
-const path          = require('path');
-const https         = require('https');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
 
-const REGION         = process.env.OSRM_REGION;
-const DATA_PATH      = process.env.OSRM_DATA_PATH;
+const REGION = process.env.OSRM_REGION;
+const DATA_PATH = process.env.OSRM_DATA_PATH;
 const CONTAINER_NAME = process.env.OSRM_CONTAINER_NAME || 'osrm-server';
 
 // ---------------------------------------------------------------------------
@@ -29,9 +29,9 @@ try {
   process.exit(1);
 }
 
-const regionName = REGION.split('/').pop();           // europe/austria → austria
-const pbfFile    = path.join(DATA_PATH, `${regionName}.osm.pbf`);
-const osrmFile   = path.join(DATA_PATH, `${regionName}.osrm`);
+const regionName = REGION.split('/').pop(); // europe/austria → austria
+const pbfFile = path.join(DATA_PATH, `${regionName}.osm.pbf`);
+const osrmFile = path.join(DATA_PATH, `${regionName}.osrm`);
 const downloadUrl = `https://download.geofabrik.de/${REGION}-latest.osm.pbf`;
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ function download(url, dest) {
   return new Promise((resolve, reject) => {
     console.log(`\n[İNDİRME] ${url}`);
 
-    const tmp  = `${dest}.tmp`;
+    const tmp = `${dest}.tmp`;
     const file = fs.createWriteStream(tmp);
 
     const request = https.get(url, (res) => {
@@ -62,8 +62,8 @@ function download(url, dest) {
         return reject(new Error(`HTTP ${res.statusCode}`));
       }
 
-      const total   = parseInt(res.headers['content-length'] || '0', 10);
-      let received  = 0;
+      const total = parseInt(res.headers['content-length'] || '0', 10);
+      let received = 0;
       let lastPrint = 0;
 
       res.on('data', (chunk) => {
@@ -111,19 +111,30 @@ async function update() {
   await download(downloadUrl, pbfFile);
 
   // 2. Extract
-  run('EXTRACT', `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-extract -p /opt/car.lua /data/${regionName}.osm.pbf`);
+  run(
+    'EXTRACT',
+    `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-extract -p /opt/car.lua /data/${regionName}.osm.pbf`,
+  );
 
   // 3. Partition
-  run('PARTITION', `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-partition /data/${regionName}.osrm`);
+  run(
+    'PARTITION',
+    `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-partition /data/${regionName}.osrm`,
+  );
 
   // 4. Customize
-  run('CUSTOMIZE', `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-customize /data/${regionName}.osrm`);
+  run(
+    'CUSTOMIZE',
+    `docker run --rm -v "${DATA_PATH}:/data" ghcr.io/project-osrm/osrm-backend osrm-customize /data/${regionName}.osrm`,
+  );
 
   // 5. OSRM container'ı yeniden başlat
   try {
     run('RESTART', `docker restart ${CONTAINER_NAME}`);
   } catch {
-    console.log(`[BİLGİ] "${CONTAINER_NAME}" container'ı bulunamadı. İlk kurulumsa aşağıdaki komutla başlatın:`);
+    console.log(
+      `[BİLGİ] "${CONTAINER_NAME}" container'ı bulunamadı. İlk kurulumsa aşağıdaki komutla başlatın:`,
+    );
     console.log(`\n  docker run -d --name ${CONTAINER_NAME} --restart unless-stopped \\`);
     console.log(`    -p 5000:5000 -v "${DATA_PATH}:/data" \\`);
     console.log(`    ghcr.io/project-osrm/osrm-backend \\`);

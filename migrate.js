@@ -1,13 +1,13 @@
 require('dotenv').config();
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
 const DB_CONFIG = {
-  host:     process.env.DB_HOST,
-  port:     parseInt(process.env.DB_PORT, 10),
-  user:     process.env.DB_USER,
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT, 10),
+  user: process.env.DB_USER,
   password: process.env.DB_PASS || '',
 };
 
@@ -19,10 +19,9 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 async function ensureDatabase() {
   const adminPool = new Pool({ ...DB_CONFIG, database: 'postgres' });
   try {
-    const { rows } = await adminPool.query(
-      'SELECT 1 FROM pg_database WHERE datname = $1',
-      [process.env.DB_NAME]
-    );
+    const { rows } = await adminPool.query('SELECT 1 FROM pg_database WHERE datname = $1', [
+      process.env.DB_NAME,
+    ]);
     if (rows.length === 0) {
       // Veritabanı adını doğrudan parametre olarak geçemeyiz,
       // ama bu değer .env'den geliyor ve sadece harf/rakam/_ içermeli.
@@ -66,11 +65,12 @@ async function migrate() {
     await client.query(ENSURE_TABLE);
 
     // Sadece "do" (ileri) dosyalarını al, versiyona göre sırala
-    const files = fs.readdirSync(MIGRATIONS_DIR)
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith('.sql'))
       .sort();
 
-    const doFiles   = files.filter((f) => f.includes('.do.'));
+    const doFiles = files.filter((f) => f.includes('.do.'));
     const undoFiles = files.filter((f) => f.includes('.undo.'));
 
     if (command === 'up') {
@@ -87,18 +87,17 @@ async function migrate() {
 
       for (const file of pending) {
         const version = file.split('.')[0];
-        const sql     = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+        const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
         console.log(`[UP] ${file}`);
         await client.query('BEGIN');
         await client.query(sql);
-        await client.query(
-          'INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)',
-          [version, file]
-        );
+        await client.query('INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)', [
+          version,
+          file,
+        ]);
         await client.query('COMMIT');
       }
       console.log('Migration tamamlandı.');
-
     } else if (command === 'down') {
       const applied = await getAppliedVersions(client);
       if (applied.size === 0) {
@@ -108,7 +107,7 @@ async function migrate() {
 
       // En son uygulananı geri al
       const lastVersion = [...applied].sort().pop();
-      const undoFile    = undoFiles.find((f) => f.startsWith(lastVersion));
+      const undoFile = undoFiles.find((f) => f.startsWith(lastVersion));
 
       if (!undoFile) {
         console.error(`[HATA] ${lastVersion} için undo dosyası bulunamadı.`);
@@ -122,12 +121,10 @@ async function migrate() {
       await client.query('DELETE FROM schema_migrations WHERE version = $1', [lastVersion]);
       await client.query('COMMIT');
       console.log('Geri alma tamamlandı.');
-
     } else {
       console.error('Geçersiz komut. Kullanım: node migrate.js [up|down]');
       process.exit(1);
     }
-
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Migration hatası:', err.message);

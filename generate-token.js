@@ -1,18 +1,18 @@
 require('dotenv').config();
 
-const crypto   = require('crypto');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  host:     process.env.DB_HOST,
-  port:     parseInt(process.env.DB_PORT, 10),
-  user:     process.env.DB_USER,
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT, 10),
+  user: process.env.DB_USER,
   password: process.env.DB_PASS || '',
   database: process.env.DB_NAME,
 });
 
 async function generateToken() {
-  const token  = `gat_${crypto.randomBytes(32).toString('hex')}`;
+  const token = `gat_${crypto.randomBytes(32).toString('hex')}`;
   const client = await pool.connect();
 
   try {
@@ -27,7 +27,9 @@ async function generateToken() {
     client.release();
   }
 
-  console.log('\n✓ Admin token oluşturuldu. Güvenli bir yere kaydedin, bir daha gösterilmeyecek:\n');
+  console.log(
+    '\n✓ Admin token oluşturuldu. Güvenli bir yere kaydedin, bir daha gösterilmeyecek:\n',
+  );
   console.log(`  ${token}\n`);
 }
 
