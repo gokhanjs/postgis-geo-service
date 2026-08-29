@@ -1,6 +1,12 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { problems } from '../lib/problem.ts';
-import { RoutingBody } from '../schemas/index.ts';
+import {
+  apiKeySecurity,
+  guardedResponses,
+  ProblemResponse,
+  RoutingBody,
+  RoutingResponse,
+} from '../schemas/index.ts';
 
 const routingRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.post(
@@ -10,7 +16,9 @@ const routingRoutes: FastifyPluginAsyncTypebox = async (app) => {
       schema: {
         tags: ['routing'],
         summary: 'Road distance and duration from one origin to many entities',
+        security: apiKeySecurity,
         body: RoutingBody,
+        response: { 200: RoutingResponse, 503: ProblemResponse, ...guardedResponses },
       },
     },
     async (request) => {

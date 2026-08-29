@@ -4,12 +4,11 @@ import { TaggedCache } from './lib/tagged-cache.ts';
 import { CredentialRepository } from './repositories/credential.repository.ts';
 import { EntityRepository } from './repositories/entity.repository.ts';
 import { HealthRepository } from './repositories/health.repository.ts';
-import { GeofenceRepository } from './repositories/geofence.repository.ts';
+import { GeofenceRepository, type GeofenceMatch } from './repositories/geofence.repository.ts';
 import { CredentialService } from './services/credential.service.ts';
-import { EntityService } from './services/entity.service.ts';
+import { EntityService, type NearbyPage } from './services/entity.service.ts';
 import { HealthService } from './services/health.service.ts';
 import { RoutingService } from './services/routing.service.ts';
-import type { SpatialCacheValue } from './services/spatial-cache.ts';
 import { GeofenceService } from './services/geofence.service.ts';
 
 export interface Services {
@@ -27,13 +26,14 @@ export interface Services {
 export function buildServices(pool: Pool, config: Config): Services {
   const entityRepository = new EntityRepository(pool);
 
-  // One cache backs both spatial read paths, so a write invalidates the
-  // entity and zone answers for that tenant together.
-  const spatialCache = new TaggedCache<SpatialCacheValue>(config.cache);
+  // One store per read path: they share no rows, so a single store would only
+  // make each write drop the other's answers.
+  const entityCache = new TaggedCache<NearbyPage>(config.cache);
+  const geofenceCache = new TaggedCache<GeofenceMatch[] | { inside: boolean }>(config.cache);
 
   return {
-    entities: new EntityService(entityRepository, spatialCache),
-    geofences: new GeofenceService(new GeofenceRepository(pool), spatialCache),
+    entities: new EntityService(entityRepository, entityCache),
+    geofences: new GeofenceService(new GeofenceRepository(pool), geofenceCache),
     credentials: new CredentialService(new CredentialRepository(pool)),
     routing: new RoutingService(entityRepository, config.osrmUrl),
     health: new HealthService(new HealthRepository(pool), config.osrmUrl),

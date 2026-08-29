@@ -73,15 +73,15 @@ describe('error responses', () => {
 });
 
 describe('rate limiting', () => {
-  it('meters each API key separately rather than each address', async () => {
-    const otherKey = await createApiKey(server.pool, 2, 'tenant-b');
+  it('meters each tenant separately rather than each address', async () => {
+    const spender = await createApiKey(server.pool, 91, 'quota-spender');
+    const otherKey = await createApiKey(server.pool, 92, 'quota-neighbour');
     const url = `${server.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant`;
 
-    // Spend the first key's whole budget. Both keys share one address, so an
-    // address-keyed limiter would spend the second key's budget too.
+    // Both share one address, which an address-keyed limiter would conflate.
     const statuses: number[] = [];
     for (let i = 0; i < 8; i += 1) {
-      const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+      const res = await fetch(url, { headers: { 'x-api-key': spender } });
       statuses.push(res.status);
     }
     // 429, not 500: the limiter's rejection has to survive the error handler.

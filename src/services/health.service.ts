@@ -17,7 +17,7 @@ export class HealthService {
     await this.#health.ping();
   }
 
-  /** Full check behind GET /health, including the optional routing backend. */
+  /** Readiness: reaches the database and reports routing without failing on it. */
   async check(): Promise<{ status: 'ok'; osrm: OsrmStatus }> {
     await this.#health.ping();
 

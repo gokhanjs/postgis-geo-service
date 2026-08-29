@@ -37,6 +37,15 @@ export default tseslint.config(
         'error',
         { paths: [{ name: 'pg', message: 'SQL belongs in src/repositories/.' }] },
       ],
+      // The pool is decorated onto the Fastify instance, so importing pg is not
+      // the only way to reach it, and autocomplete offers the other one.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='pg']",
+          message: 'Reach the database through a repository, not app.pg.',
+        },
+      ],
     },
   },
 );

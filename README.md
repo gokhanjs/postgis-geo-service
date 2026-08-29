@@ -91,7 +91,7 @@ curl 'http://localhost:3000/api/v1/geofences/containing?lat=41.0082&lng=28.9784&
 ```bash
 curl -X POST http://localhost:3000/api/v1/routing/distances \
   -H 'x-api-key: gsk_...' -H 'content-type: application/json' \
-  -d '{"origin": {"lat": 41.0082, "lng": 28.9784},
+  -d '{"origin": {"lat": 41.0189, "lng": 28.9647},
        "destinations": [{"entity_id": "rest-42", "entity_type": "restaurant"}]}'
 ```
 
@@ -120,6 +120,7 @@ Requires Docker and Node.js 22+.
 git clone https://github.com/gokhanjs/postgis-geo-service.git
 cd postgis-geo-service
 cp .env.example .env
+pnpm install
 docker compose up -d
 ```
 
@@ -159,8 +160,9 @@ it, `/routing/*` answers `503` and nothing else changes.
 
 ## API
 
-Full reference at `/docs`, generated from the same schemas that validate
-requests, so it cannot drift from the implementation.
+Full reference at `/docs`, generated from the same TypeBox schemas the service
+validates against, so the request and response shapes it documents are the ones
+it enforces.
 
 | Method   | Path                           | Purpose                                        |
 | -------- | ------------------------------ | ---------------------------------------------- |
@@ -185,7 +187,7 @@ details, served as `application/problem+json`:
 
 ```json
 {
-  "type": "https://github.com/gokhanjs/postgis-geo-service/docs/errors/invalid-geometry",
+  "type": "urn:geo-service:problem:invalid-geometry",
   "title": "Invalid geometry",
   "status": 400,
   "detail": "Each polygon ring must be closed: the last position repeats the first",
@@ -193,7 +195,9 @@ details, served as `application/problem+json`:
 }
 ```
 
-`type` is stable and safe to branch on; `title` and `detail` are for people.
+`type` is a stable identifier to branch on, deliberately a URN rather than a
+URL: a link that has to stay alive is a worse contract than a name that cannot
+rot. `title` and `detail` are for people.
 
 ### Coordinate order
 
@@ -221,9 +225,10 @@ Request
        └─ the guarantee holds even if the query above forgets its predicate
 ```
 
-The layering is enforced, not documented: ESLint rejects a `pg` import from
-`src/routes` or `src/services`, so the boundary fails CI rather than eroding
-over time.
+Part of the layering is enforced rather than documented: ESLint rejects both a
+`pg` import and an `app.pg` access from `src/routes` or `src/services`, and CI
+rejects a cast of an indexed geometry column or an `ST_Contains`. The rest of
+`AGENTS.md` is convention that review has to catch.
 
 ```
 src/
@@ -242,7 +247,9 @@ src/
 
 The service connects to PostgreSQL as a **restricted role**, not the owner.
 Each request sets `app.tenant_id` transaction-locally, and row-level security
-policies filter every read and write against it.
+policies filter every read and write of the two spatial tables against it. The
+credential tables sit outside those policies by necessity: resolving which
+tenant is calling happens before there is a tenant to filter on.
 
 This matters because the alternative is a convention. In a codebase where
 isolation depends on every query carrying `WHERE tenant_id = $1`, isolation
@@ -259,9 +266,9 @@ Two details make it real rather than decorative:
   request that used it, so a session-level `SET` would hand one tenant's
   identity to the next request that reused the connection.
 
-Ten tests assert this, including four that drive the running service over HTTP
-as one tenant and confirm another tenant's data is unreachable on every read
-path.
+Ten tests assert this: six against the policies directly, issuing queries with
+no tenant predicate at all, and four driving the running service over HTTP as
+one tenant to confirm another tenant's data is unreachable.
 
 ---
 

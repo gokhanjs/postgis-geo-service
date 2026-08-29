@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -65,11 +68,11 @@ jobs:
           set -e
           # Casting a PARAMETER is fine and necessary; casting the indexed
           # COLUMN inside a predicate is what defeats the GiST index.
-          if grep -rnE '\((location|area)::geography' src/ --include='*.ts'; then
+          if grep -rnE '(location|area)::(geography|geometry)' src/ --include='*.ts' | grep -vE '^[^:]+:[0-9]+:\s*(//|\*|/\*)' | grep -v 'ST_X\|ST_Y'; then
             echo "Casting the indexed column stops the GiST index being usable." >&2
             exit 1
           fi
-          if grep -rn 'ST_Contains' src/ --include='*.ts' | grep -vE ':\s*(//|\*)'; then
+          if grep -rn 'ST_Contains' src/ --include='*.ts' | grep -vE '^[^:]+:[0-9]+:\s*(//|\*|/\*)'; then
             echo "Use ST_Covers: ST_Contains excludes shared boundaries." >&2
             exit 1
           fi

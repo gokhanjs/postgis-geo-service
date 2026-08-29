@@ -65,13 +65,16 @@ function toProblem(error: unknown, instance: string): Problem {
   const fastifyError = error as { statusCode?: number; validation?: unknown; message?: string };
   if (fastifyError.validation !== undefined) {
     return {
-      type: 'about:blank',
+      type: 'urn:geo-service:problem:validation-failed',
       title: 'Request validation failed',
       status: 400,
       detail: fastifyError.message ?? 'The request did not match the expected schema.',
       instance,
     };
   }
+
+  const fromDatabase = databaseProblem(error, instance);
+  if (fromDatabase !== null) return fromDatabase;
 
   const status = fastifyError.statusCode ?? 500;
   if (status < 500) {
@@ -89,4 +92,37 @@ function toProblem(error: unknown, instance: string): Problem {
     status: 500,
     instance,
   };
+}
+
+// Rules the database enforces are still the caller's mistake.
+const SQLSTATE = {
+  checkViolation: '23514',
+  uniqueViolation: '23505',
+  notNullViolation: '23502',
+  numericOutOfRange: '22003',
+  invalidText: '22P02',
+} as const;
+
+function databaseProblem(error: unknown, instance: string): Problem | null {
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== 'string') return null;
+
+  switch (code) {
+    case SQLSTATE.checkViolation: {
+      const constraint = (error as { constraint?: string }).constraint;
+      const detail =
+        constraint === 'geofences_area_valid'
+          ? 'The polygon is not valid: it may be self-intersecting.'
+          : 'The value violates a constraint on the target table.';
+      return { type: 'about:blank', title: 'Invalid geometry', status: 400, detail, instance };
+    }
+    case SQLSTATE.uniqueViolation:
+      return { type: 'about:blank', title: 'Already exists', status: 409, instance };
+    case SQLSTATE.notNullViolation:
+    case SQLSTATE.numericOutOfRange:
+    case SQLSTATE.invalidText:
+      return { type: 'about:blank', title: 'Request rejected', status: 400, instance };
+    default:
+      return null;
+  }
 }

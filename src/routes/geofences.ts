@@ -1,6 +1,16 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { Type } from '@sinclair/typebox';
 import { problems } from '../lib/problem.ts';
-import { ContainingQuery, GeofenceBody, GeofencePathParams } from '../schemas/index.ts';
+import {
+  apiKeySecurity,
+  ContainingQuery,
+  ContainingResponse,
+  GeofenceAck,
+  GeofenceBody,
+  GeofencePathParams,
+  guardedResponses,
+  ProblemResponse,
+} from '../schemas/index.ts';
 
 const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.put(
@@ -11,8 +21,10 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
         tags: ['geofences'],
         summary: 'Create or replace one geofence',
         description: 'The identifier is the caller’s own and is unique within its tenant.',
+        security: apiKeySecurity,
         params: GeofencePathParams,
         body: GeofenceBody,
+        response: { 200: GeofenceAck, ...guardedResponses },
       },
     },
     async (request) => {
@@ -41,7 +53,9 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
       schema: {
         tags: ['geofences'],
         summary: 'Delete one geofence',
+        security: apiKeySecurity,
         params: GeofencePathParams,
+        response: { 204: Type.Null(), 404: ProblemResponse, ...guardedResponses },
       },
     },
     async (request, reply) => {
@@ -51,7 +65,7 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
       );
       if (!deleted) throw problems.notFound('Geofence');
 
-      return reply.code(204).send();
+      return reply.code(204).send(null);
     },
   );
 
@@ -64,7 +78,9 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
         summary: 'Find the geofences covering a point',
         description:
           'Naming an entity answers whether that one covers the point; omitting it lists every entity of the type that does.',
+        security: apiKeySecurity,
         querystring: ContainingQuery,
+        response: { 200: ContainingResponse, ...guardedResponses },
       },
     },
     async (request) => {

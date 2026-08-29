@@ -93,7 +93,7 @@ describe('F-03: invalid geometry is refused at the door', () => {
     };
 
     const res = await syncZone(key, 50, 'r1', bowtie);
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBe(400);
 
     const { rows } = await server.pool.query('SELECT count(*)::int AS n FROM geofences');
     expect(rows[0]).toEqual({ n: 0 });

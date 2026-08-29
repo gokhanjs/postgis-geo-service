@@ -145,6 +145,13 @@ async function main(): Promise<void> {
   const client = await pool.connect();
 
   try {
+    await client.query("SELECT set_config('geo.runtime_user', $1, false)", [
+      process.env.DB_USER ?? 'geo_app',
+    ]);
+    await client.query("SELECT set_config('geo.runtime_password', $1, false)", [
+      process.env.DB_PASS ?? 'geo_app',
+    ]);
+
     await client.query(ENSURE_TABLE);
     await (command === 'up' ? runUp(client) : runDown(client));
   } catch (err) {

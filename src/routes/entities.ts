@@ -1,5 +1,13 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { EntityBody, EntityPathParams, NearbyQuery, NearbyResponse } from '../schemas/index.ts';
+import {
+  apiKeySecurity,
+  EntityAck,
+  EntityBody,
+  EntityPathParams,
+  guardedResponses,
+  NearbyQuery,
+  NearbyResponse,
+} from '../schemas/index.ts';
 
 const entityRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.put(
@@ -9,8 +17,10 @@ const entityRoutes: FastifyPluginAsyncTypebox = async (app) => {
       schema: {
         tags: ['entities'],
         summary: 'Create or replace the location of one entity',
+        security: apiKeySecurity,
         params: EntityPathParams,
         body: EntityBody,
+        response: { 200: EntityAck, ...guardedResponses },
       },
     },
     async (request) => {
@@ -37,8 +47,9 @@ const entityRoutes: FastifyPluginAsyncTypebox = async (app) => {
       schema: {
         tags: ['entities'],
         summary: 'Find entities of one type within a radius, nearest first',
+        security: apiKeySecurity,
         querystring: NearbyQuery,
-        response: { 200: NearbyResponse },
+        response: { 200: NearbyResponse, ...guardedResponses },
       },
     },
     async (request) => {

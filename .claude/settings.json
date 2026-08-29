@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm test)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm format:check)",
+      "Bash(pnpm migrate)",
+      "Bash(docker compose ps)",
+      "Bash(docker compose logs:*)"
+    ]
+  }
+}

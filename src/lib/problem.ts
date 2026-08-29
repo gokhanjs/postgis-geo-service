@@ -12,7 +12,8 @@ export interface Problem {
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 
-const BASE = 'https://github.com/gokhanjs/postgis-geo-service/docs/errors';
+// A URN, not a URL: an identifier that cannot rot beats a link that must live.
+const BASE = 'urn:geo-service:problem';
 
 export class HttpProblem extends Error {
   readonly status: number;
@@ -23,7 +24,7 @@ export class HttpProblem extends Error {
     super(detail ?? title);
     this.name = 'HttpProblem';
     this.status = status;
-    this.type = `${BASE}/${type}`;
+    this.type = `${BASE}:${type}`;
     this.title = title;
   }
 }

@@ -1,6 +1,7 @@
 import { validatePolygon } from '../lib/geojson.ts';
 import type { GeofenceMatch, GeofenceRepository } from '../repositories/geofence.repository.ts';
-import { cacheTag, readCached, type SpatialCache } from './spatial-cache.ts';
+import type { TaggedCache } from '../lib/tagged-cache.ts';
+import { cacheTag } from './spatial-cache.ts';
 
 export interface GeofenceSyncInput {
   externalId: number;
@@ -14,9 +15,12 @@ export interface GeofenceSyncInput {
 
 export class GeofenceService {
   readonly #geofences: GeofenceRepository;
-  readonly #cache: SpatialCache;
+  readonly #cache: TaggedCache<GeofenceMatch[] | { inside: boolean }>;
 
-  constructor(geofences: GeofenceRepository, cache: SpatialCache) {
+  constructor(
+    geofences: GeofenceRepository,
+    cache: TaggedCache<GeofenceMatch[] | { inside: boolean }>,
+  ) {
     this.#geofences = geofences;
     this.#cache = cache;
   }
@@ -26,8 +30,13 @@ export class GeofenceService {
     const validation = validatePolygon(input.area);
     if (!validation.ok) return validation.reason;
 
-    await this.#geofences.upsert({ ...input, area: validation.polygon });
+    // Re-syncing under a new type leaves the old type's answers naming it.
+    const previousType = await this.#geofences.upsert({ ...input, area: validation.polygon });
+
     this.#cache.invalidate(cacheTag(input.entityType, input.tenantId));
+    if (previousType !== null && previousType !== input.entityType) {
+      this.#cache.invalidate(cacheTag(previousType, input.tenantId));
+    }
     return null;
   }
 
@@ -50,11 +59,11 @@ export class GeofenceService {
     const tag = cacheTag(entityType, tenantId);
     const key = `geofence:check\x00${tag}\x00${entityId}\x00${lat}\x00${lng}`;
 
-    const cached = readCached(this.#cache, key, 'geofenceCheck');
-    if (cached !== undefined) return { inside: cached.inside };
+    const cached = this.#cache.get(key);
+    if (cached !== undefined && !Array.isArray(cached)) return cached;
 
     const inside = await this.#geofences.coversPoint(tenantId, entityType, entityId, lng, lat);
-    this.#cache.set(tag, key, { kind: 'geofenceCheck', inside });
+    this.#cache.set(tag, key, { inside });
     return { inside };
   }
 
@@ -67,11 +76,11 @@ export class GeofenceService {
     const tag = cacheTag(entityType, tenantId);
     const key = `geofence:check\x00${tag}\x00${lat}\x00${lng}`;
 
-    const cached = readCached(this.#cache, key, 'geofenceMatches');
-    if (cached !== undefined) return cached.rows;
+    const cached = this.#cache.get(key);
+    if (Array.isArray(cached)) return cached;
 
     const rows = await this.#geofences.findCovering(tenantId, entityType, lng, lat);
-    this.#cache.set(tag, key, { kind: 'geofenceMatches', rows });
+    this.#cache.set(tag, key, rows);
     return rows;
   }
 }

@@ -2,14 +2,13 @@
 
 ## Reporting a vulnerability
 
-Report privately through GitHub's
-[security advisory](https://github.com/gokhanjs/postgis-geo-service/security/advisories/new)
-form rather than opening an issue. Expect an acknowledgement within a few days.
+Report privately through this repository's GitHub security advisory form
+(Security tab, "Report a vulnerability") rather than opening an issue. Expect an acknowledgement within a few days.
 
 ## What this service guarantees
 
-- **Tenant isolation** is enforced by PostgreSQL row-level security, not by
-  application predicates. The service connects as a role that owns nothing and
+- **Tenant isolation** of the two spatial tables is enforced by PostgreSQL
+  row-level security, not by application predicates. The service connects as a role that owns nothing and
   has no `BYPASSRLS`, so a query missing a tenant predicate returns nothing
   rather than another tenant's rows.
 - **Credentials are stored as digests.** API keys and admin tokens cannot be

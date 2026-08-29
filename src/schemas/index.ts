@@ -2,14 +2,19 @@ import { Type } from '@sinclair/typebox';
 
 const Latitude = Type.Number({ minimum: -90, maximum: 90, description: 'WGS 84 latitude.' });
 const Longitude = Type.Number({ minimum: -180, maximum: 180, description: 'WGS 84 longitude.' });
+// A NUL byte cannot be stored in a Postgres text column; it would be a 500.
+const IDENTIFIER_PATTERN = '^[\\x20-\\x7E]+$';
+
 const EntityId = Type.String({
   minLength: 1,
   maxLength: 100,
+  pattern: IDENTIFIER_PATTERN,
   description: "The identifier this entity has in the caller's own system.",
 });
 const EntityType = Type.String({
   minLength: 1,
   maxLength: 100,
+  pattern: IDENTIFIER_PATTERN,
   description: 'Caller-defined category, for example "restaurant" or "courier".',
 });
 
@@ -99,14 +104,19 @@ export const RoutingBody = Type.Object(
 
 export const AdminKeyBody = Type.Object(
   {
-    tenant_id: Type.Integer(),
-    project_name: Type.String({ minLength: 1, maxLength: 200 }),
+    tenant_id: Type.Integer({ minimum: 1, maximum: 2_147_483_647 }),
+    project_name: Type.String({ minLength: 1, maxLength: 200, pattern: IDENTIFIER_PATTERN }),
   },
   { additionalProperties: false },
 );
 
 export const AdminKeyParams = Type.Object({
-  prefix: Type.String({ description: 'The key_prefix shown when listing keys.' }),
+  prefix: Type.String({
+    minLength: 4,
+    maxLength: 12,
+    pattern: '^gsk_[0-9a-f]*$',
+    description: 'The key_prefix shown when listing keys.',
+  }),
 });
 
 export const ProblemResponse = Type.Object(
@@ -119,3 +129,53 @@ export const ProblemResponse = Type.Object(
   },
   { description: 'RFC 9457 problem details.' },
 );
+
+export const EntityAck = Type.Object({ entity_id: Type.String(), entity_type: Type.String() });
+
+export const GeofenceAck = Type.Object({
+  id: Type.Integer(),
+  entity_id: Type.String(),
+  entity_type: Type.String(),
+});
+
+export const ContainingResponse = Type.Union([
+  Type.Object({ results: Type.Array(Type.Object({ entity_id: Type.String() })) }),
+  Type.Object({ inside: Type.Boolean() }),
+]);
+
+export const RoutingResponse = Type.Array(
+  Type.Object({
+    entity_id: Type.String(),
+    entity_type: Type.String(),
+    road_distance_km: Type.Union([Type.Number(), Type.Null()]),
+    duration_min: Type.Union([Type.Number(), Type.Null()]),
+  }),
+);
+
+export const IssuedKeyResponse = Type.Object({
+  key: Type.String({ description: 'Shown once. Only its digest is stored.' }),
+  tenant_id: Type.Integer(),
+  project_name: Type.String(),
+});
+
+export const KeyListResponse = Type.Array(
+  Type.Object({
+    key_prefix: Type.String(),
+    tenant_id: Type.Integer(),
+    project_name: Type.String(),
+    is_active: Type.Boolean(),
+    created_at: Type.String({ format: 'date-time' }),
+  }),
+);
+
+export const SuccessResponse = Type.Object({ success: Type.Boolean() });
+
+/** Attached to every guarded route, so the reference documents its failures. */
+export const guardedResponses = {
+  400: ProblemResponse,
+  401: ProblemResponse,
+  429: ProblemResponse,
+} as const;
+
+export const apiKeySecurity = [{ apiKey: [] }];
+export const adminSecurity = [{ adminToken: [] }];

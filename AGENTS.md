@@ -2,13 +2,13 @@
 
 Instructions for coding agents working in this repository.
 
-Every rule below is a defect this project has already had. None of them are
-style preferences, and most are checked by `pnpm lint` or the test suite, so
-breaking one fails the build rather than waiting for review.
+Every rule below is a defect this project has already had, so none are style
+preferences. Three are checked mechanically and marked **[enforced]**; the rest
+rely on you.
 
 ## Architecture invariants
 
-**SQL lives only in `src/repositories/`.** Routes map HTTP to a service call;
+**SQL lives only in `src/repositories/`.** [enforced] Routes map HTTP to a service call;
 services hold business logic and know neither HTTP nor SQL. ESLint rejects a
 `pg` import from `src/routes` or `src/services`.
 
@@ -17,12 +17,12 @@ Row-level security is the backstop, not the primary guard: write the tenant
 predicate _and_ rely on the policy. A method that skips `withTenant` will read
 zero rows, because the policy has no tenant to match.
 
-**Never cast the indexed column.** Columns are `geography`; casting a
+**Never cast the indexed column.** [enforced] Columns are `geography`; casting a
 parameter (`$1::geography`) is fine and necessary, but casting the column
 inside a predicate (`location::geography`) makes it an expression that no GiST
 index can serve, so the index silently stops being used.
 
-**Use `ST_Covers`, not `ST_Contains`.** `ST_Contains` excludes the boundary, so
+**Use `ST_Covers`, not `ST_Contains`.** [enforced] `ST_Contains` excludes the boundary, so
 a point on an edge shared by two adjacent areas belongs to neither.
 
 **Filter and report with the same earth model.** `ST_DWithin` on geography

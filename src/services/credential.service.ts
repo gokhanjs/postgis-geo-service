@@ -1,10 +1,5 @@
 import { LRUCache } from 'lru-cache';
-import {
-  digestsMatch,
-  generateApiKey,
-  hashCredential,
-  KEY_PREFIX_LENGTH,
-} from '../lib/credentials.ts';
+import { generateApiKey, hashCredential, KEY_PREFIX_LENGTH } from '../lib/credentials.ts';
 import type {
   ApiKeyRecord,
   CredentialRepository,
@@ -25,7 +20,6 @@ export class CredentialService {
   // Keyed by digest, never by the secret itself, so the plaintext key exists
   // only for the length of the request that presented it.
   readonly #tenantByHash = new LRUCache<string, TenantContext>({ max: 200, ttl: CACHE_TTL_MS });
-  readonly #adminHashes = new LRUCache<string, true>({ max: 10, ttl: CACHE_TTL_MS });
 
   constructor(credentials: CredentialRepository) {
     this.#credentials = credentials;
@@ -44,15 +38,10 @@ export class CredentialService {
     return context;
   }
 
+  /** Not cached: rotation must take effect at once, and admin traffic is rare. */
   async isValidAdminToken(token: string): Promise<boolean> {
     const hash = hashCredential(token);
-    if (this.#adminHashes.has(hash)) return true;
-
-    const stored = await this.#credentials.findAdminTokenHash(hash);
-    if (stored === null || !digestsMatch(stored, hash)) return false;
-
-    this.#adminHashes.set(hash, true);
-    return true;
+    return await this.#credentials.adminTokenExists(hash);
   }
 
   async issueApiKey(tenantId: number, projectName: string): Promise<IssuedKey> {

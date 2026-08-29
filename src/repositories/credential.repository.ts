@@ -8,7 +8,7 @@ export interface TenantContext {
 export interface ApiKeyRecord extends TenantContext {
   key_prefix: string;
   is_active: boolean;
-  created_at: Date;
+  created_at: string;
 }
 
 export class CredentialRepository {
@@ -26,12 +26,11 @@ export class CredentialRepository {
     return rows[0] ?? null;
   }
 
-  async findAdminTokenHash(tokenHash: string): Promise<string | null> {
-    const { rows } = await this.#pool.query<{ token_hash: string }>(
-      'SELECT token_hash FROM admin_tokens WHERE token_hash = $1',
-      [tokenHash],
-    );
-    return rows[0]?.token_hash ?? null;
+  async adminTokenExists(tokenHash: string): Promise<boolean> {
+    const { rows } = await this.#pool.query('SELECT 1 FROM admin_tokens WHERE token_hash = $1', [
+      tokenHash,
+    ]);
+    return rows.length > 0;
   }
 
   async insertApiKey(
@@ -48,7 +47,8 @@ export class CredentialRepository {
 
   async listApiKeys(): Promise<ApiKeyRecord[]> {
     const { rows } = await this.#pool.query<ApiKeyRecord>(
-      `SELECT key_prefix, tenant_id, project_name, is_active, created_at
+      `SELECT key_prefix, tenant_id, project_name, is_active,
+              to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF:00') AS created_at
        FROM api_keys ORDER BY created_at DESC`,
     );
     return rows;

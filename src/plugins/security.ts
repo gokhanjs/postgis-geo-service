@@ -4,7 +4,6 @@ import rateLimit from '@fastify/rate-limit';
 import fp from 'fastify-plugin';
 import type { FastifyRequest } from 'fastify';
 import { config } from '../config/index.ts';
-import { hashCredential } from '../lib/credentials.ts';
 import { PROBLEM_CONTENT_TYPE, problems } from '../lib/problem.ts';
 
 export default fp(
@@ -12,21 +11,19 @@ export default fp(
     await app.register(helmet);
     await app.register(cors, {
       origin: config.corsOrigins ?? false,
-      methods: ['GET', 'POST', 'DELETE'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
       allowedHeaders: ['content-type', 'x-api-key', 'x-admin-token'],
       maxAge: 86_400,
     });
 
     await app.register(rateLimit, {
-      max: config.rateLimit.max,
+      max: config.rateLimit.ipMax,
       timeWindow: config.rateLimit.timeWindow,
       // Quota belongs to the credential, not the address: many tenants behind
       // one gateway would otherwise share a budget, and one tenant spread over
       // many addresses would escape it entirely.
-      keyGenerator: (request: FastifyRequest) => {
-        const key = request.headers['x-api-key'];
-        return typeof key === 'string' ? `key:${hashCredential(key)}` : `ip:${request.ip}`;
-      },
+      // By address: the unvalidated x-api-key header could simply be rotated.
+      keyGenerator: (request: FastifyRequest) => request.ip,
       errorResponseBuilder: (_request, context) => {
         const problem = problems.tooManyRequests();
         return {

@@ -18,4 +18,6 @@ CREATE TABLE admin_tokens (
 );
 
 -- Resolving the tenant happens before RLS has anything to filter on.
-GRANT SELECT, INSERT, UPDATE, DELETE ON api_keys, admin_tokens TO geo_app;
+-- Least privilege: no admin-token writes, and revocation is a flag not a delete.
+GRANT SELECT, INSERT, UPDATE ON api_keys TO geo_app;
+GRANT SELECT ON admin_tokens TO geo_app;

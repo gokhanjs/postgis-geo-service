@@ -25,9 +25,15 @@ export class GeofenceRepository {
   /**
    * The conflict target is (tenant_id, external_id), so an identifier a tenant
    * chose can only ever replace that tenant's own row.
+   * Returns the type the row held before, so the caller can invalidate it too.
    */
-  async upsert(input: GeofenceInput): Promise<void> {
-    await withTenant(this.#pool, input.tenantId, async (client) => {
+  async upsert(input: GeofenceInput): Promise<string | null> {
+    return withTenant(this.#pool, input.tenantId, async (client) => {
+      const { rows: existing } = await client.query<{ entity_type: string }>(
+        'SELECT entity_type FROM geofences WHERE tenant_id = $1 AND external_id = $2',
+        [input.tenantId, input.externalId],
+      );
+
       await client.query(
         `
         INSERT INTO geofences (external_id, entity_id, entity_type, tenant_id, area, is_active)
@@ -48,6 +54,8 @@ export class GeofenceRepository {
           input.isActive,
         ],
       );
+
+      return existing[0]?.entity_type ?? null;
     });
   }
 

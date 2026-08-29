@@ -34,6 +34,7 @@ export default fp(
       if (tenant === null) throw problems.invalidApiKey();
 
       request.tenantContext = tenant;
+      app.chargeTenantQuota(tenant.tenant_id);
     });
 
     app.decorate('authenticateAdmin', async (request: FastifyRequest) => {

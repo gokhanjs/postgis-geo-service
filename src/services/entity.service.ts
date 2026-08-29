@@ -3,7 +3,8 @@ import type {
   EntityRepository,
   NearbyRow,
 } from '../repositories/entity.repository.ts';
-import { cacheTag, readCached, type SpatialCache } from './spatial-cache.ts';
+import type { TaggedCache } from '../lib/tagged-cache.ts';
+import { cacheTag } from './spatial-cache.ts';
 
 export interface NearbyRequest {
   tenantId: number;
@@ -22,9 +23,9 @@ export interface NearbyPage {
 
 export class EntityService {
   readonly #entities: EntityRepository;
-  readonly #cache: SpatialCache;
+  readonly #cache: TaggedCache<NearbyPage>;
 
-  constructor(entities: EntityRepository, cache: SpatialCache) {
+  constructor(entities: EntityRepository, cache: TaggedCache<NearbyPage>) {
     this.#entities = entities;
     this.#cache = cache;
   }
@@ -46,8 +47,8 @@ export class EntityService {
       request.cursor ?? '',
     ].join('\x00');
 
-    const cached = readCached(this.#cache, key, 'nearby');
-    if (cached !== undefined) return cached.page;
+    const cached = this.#cache.get(key);
+    if (cached !== undefined) return cached;
 
     const after = decodeCursor(request.cursor);
     const results = await this.#entities.findNearby({
@@ -69,7 +70,7 @@ export class EntityService {
         results.length === request.limit && last !== undefined ? encodeCursor(last) : null,
     };
 
-    this.#cache.set(tag, key, { kind: 'nearby', page });
+    this.#cache.set(tag, key, page);
     return page;
   }
 }

@@ -54,8 +54,8 @@ export const config = {
     connectionTimeoutMillis: 5_000,
   },
 
-  /** Absent means routing is disabled and /routing answers 503. */
-  osrmUrl: process.env.OSRM_URL ?? null,
+  /** Absent or empty means routing is disabled; compose passes through empty. */
+  osrmUrl: process.env.OSRM_URL || null,
 
   /** Absent means no network restriction. */
   allowedIps: (() => {
@@ -73,6 +73,8 @@ export const config = {
 
   rateLimit: {
     max: Number.parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
+    /** Per address, deliberately far looser: it sheds unauthenticated abuse only. */
+    ipMax: Number.parseInt(process.env.RATE_LIMIT_IP_MAX ?? '1000', 10),
     timeWindow: Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
   },
 
