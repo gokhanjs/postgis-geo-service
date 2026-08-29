@@ -5,9 +5,7 @@ export const ADMIN_TOKEN = 'gat_test_admin_token';
 
 /** Wipes every table the suite writes to, so each test starts from a known state. */
 export async function resetDatabase(pool: Pool): Promise<void> {
-  await pool.query(
-    'TRUNCATE entity_locations, geofences, api_keys, admin_tokens, collection_tokens',
-  );
+  await pool.query('TRUNCATE entity_locations, geofences, api_keys, admin_tokens');
   await pool.query('INSERT INTO admin_tokens (token_hash) VALUES ($1)', [
     hashCredential(ADMIN_TOKEN),
   ]);

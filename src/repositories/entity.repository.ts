@@ -16,12 +16,15 @@ export interface NearbyQuery {
   lat: number;
   lng: number;
   radiusKm: number;
+  limit: number;
+  /** Distance in km of the last row of the previous page. */
+  afterDistanceKm: number | null;
+  afterEntityId: string | null;
 }
 
 export interface NearbyRow {
   entity_id: string;
-  /** numeric, so node-postgres hands it back as a string. */
-  distance_km: string;
+  distance_km: number;
 }
 
 export interface EntityCoordinate {
@@ -29,6 +32,11 @@ export interface EntityCoordinate {
   entity_type: string;
   lng: number;
   lat: number;
+}
+
+export interface DestinationRef {
+  entity_id: string;
+  entity_type: string;
 }
 
 export class EntityRepository {
@@ -55,51 +63,68 @@ export class EntityRepository {
     });
   }
 
+  /**
+   * Pages on (distance, entity_id) rather than an offset, so a concurrent write
+   * cannot make a row appear twice or vanish between pages.
+   */
   async findNearby(query: NearbyQuery): Promise<NearbyRow[]> {
     return withTenant(this.#pool, query.tenantId, async (client) => {
-      // ST_DWithin filters and ST_Distance reports on the same spheroid, so a
-      // row can never be listed with a distance outside the radius it passed.
-      const { rows } = await client.query<NearbyRow>(
+      const { rows } = await client.query<{ entity_id: string; distance_km: string }>(
         `
-        SELECT
-          entity_id,
-          ROUND((ST_Distance(location, $1::geography) / 1000)::numeric, 2) AS distance_km
+        SELECT entity_id,
+               ROUND((ST_Distance(location, $1::geography) / 1000)::numeric, 3) AS distance_km
         FROM entity_locations
         WHERE is_active
           AND entity_type = $2
           AND tenant_id   = $3
           AND ST_DWithin(location, $1::geography, $4)
-        ORDER BY distance_km ASC;
+          AND (
+            $5::numeric IS NULL
+            OR (ROUND((ST_Distance(location, $1::geography) / 1000)::numeric, 3), entity_id)
+               > ($5::numeric, $6::text)
+          )
+        ORDER BY distance_km ASC, entity_id ASC
+        LIMIT $7;
         `,
         [
           pointLiteral(query.lng, query.lat),
           query.entityType,
           query.tenantId,
           query.radiusKm * 1000,
+          query.afterDistanceKm,
+          query.afterEntityId,
+          query.limit,
         ],
       );
-      return rows;
+
+      return rows.map((row) => ({
+        entity_id: row.entity_id,
+        distance_km: Number(row.distance_km),
+      }));
     });
   }
 
+  /**
+   * Matches identifier and type as a pair. Filtering the two lists separately
+   * also returned combinations the caller never asked for.
+   */
   async findCoordinates(
     tenantId: number,
-    entityIds: readonly string[],
-    entityTypes: readonly string[],
+    destinations: readonly DestinationRef[],
   ): Promise<EntityCoordinate[]> {
     return withTenant(this.#pool, tenantId, async (client) => {
       const { rows } = await client.query<EntityCoordinate>(
         `
-        SELECT entity_id, entity_type,
-               ST_X(location::geometry) AS lng,
-               ST_Y(location::geometry) AS lat
-        FROM   entity_locations
-        WHERE  tenant_id   = $1
-          AND  entity_id   = ANY($2)
-          AND  entity_type = ANY($3)
-          AND  is_active
+        SELECT e.entity_id, e.entity_type,
+               ST_X(e.location::geometry) AS lng,
+               ST_Y(e.location::geometry) AS lat
+        FROM   entity_locations e
+        JOIN   unnest($2::text[], $3::text[]) AS wanted(entity_id, entity_type)
+          ON   e.entity_id = wanted.entity_id AND e.entity_type = wanted.entity_type
+        WHERE  e.tenant_id = $1
+          AND  e.is_active
         `,
-        [tenantId, entityIds, entityTypes],
+        [tenantId, destinations.map((d) => d.entity_id), destinations.map((d) => d.entity_type)],
       );
       return rows;
     });

@@ -1,10 +1,24 @@
 import type {
   EntityLocationInput,
   EntityRepository,
-  NearbyQuery,
   NearbyRow,
 } from '../repositories/entity.repository.ts';
 import { cacheTag, readCached, type SpatialCache } from './spatial-cache.ts';
+
+export interface NearbyRequest {
+  tenantId: number;
+  entityType: string;
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  limit: number;
+  cursor: string | undefined;
+}
+
+export interface NearbyPage {
+  results: NearbyRow[];
+  next_cursor: string | null;
+}
 
 export class EntityService {
   readonly #entities: EntityRepository;
@@ -20,15 +34,62 @@ export class EntityService {
     this.#cache.invalidate(cacheTag(input.entityType, input.tenantId));
   }
 
-  async findNearby(query: NearbyQuery): Promise<NearbyRow[]> {
-    const tag = cacheTag(query.entityType, query.tenantId);
-    const key = `nearby\x00${tag}\x00${query.lat}\x00${query.lng}\x00${query.radiusKm}`;
+  async findNearby(request: NearbyRequest): Promise<NearbyPage> {
+    const tag = cacheTag(request.entityType, request.tenantId);
+    const key = [
+      'nearby',
+      tag,
+      request.lat,
+      request.lng,
+      request.radiusKm,
+      request.limit,
+      request.cursor ?? '',
+    ].join('\x00');
 
     const cached = readCached(this.#cache, key, 'nearby');
-    if (cached !== undefined) return cached.rows;
+    if (cached !== undefined) return cached.page;
 
-    const rows = await this.#entities.findNearby(query);
-    this.#cache.set(tag, key, { kind: 'nearby', rows });
-    return rows;
+    const after = decodeCursor(request.cursor);
+    const results = await this.#entities.findNearby({
+      tenantId: request.tenantId,
+      entityType: request.entityType,
+      lat: request.lat,
+      lng: request.lng,
+      radiusKm: request.radiusKm,
+      limit: request.limit,
+      afterDistanceKm: after?.distanceKm ?? null,
+      afterEntityId: after?.entityId ?? null,
+    });
+
+    const last = results[results.length - 1];
+    const page: NearbyPage = {
+      results,
+      // A full page implies there may be more; a short one is the end.
+      next_cursor:
+        results.length === request.limit && last !== undefined ? encodeCursor(last) : null,
+    };
+
+    this.#cache.set(tag, key, { kind: 'nearby', page });
+    return page;
   }
+}
+
+interface Cursor {
+  distanceKm: number;
+  entityId: string;
+}
+
+function encodeCursor(row: NearbyRow): string {
+  return Buffer.from(`${row.distance_km}\x00${row.entity_id}`, 'utf8').toString('base64url');
+}
+
+/** A malformed cursor reads as "start from the beginning" rather than an error. */
+function decodeCursor(cursor: string | undefined): Cursor | null {
+  if (cursor === undefined) return null;
+
+  const [distance, entityId] = Buffer.from(cursor, 'base64url').toString('utf8').split('\x00');
+  const distanceKm = Number(distance);
+
+  if (entityId === undefined || !Number.isFinite(distanceKm)) return null;
+  return { distanceKm, entityId };
 }

@@ -65,7 +65,7 @@ describe('error responses', () => {
   });
 
   it('returns a correlation id the caller can quote', async () => {
-    const res = await fetch(`${server.baseUrl}/health`, {
+    const res = await fetch(`${server.baseUrl}/health/live`, {
       headers: { 'x-request-id': 'known-value' },
     });
     expect(res.headers.get('x-request-id')).toBe('known-value');
@@ -125,16 +125,10 @@ describe('geometry validation', () => {
   });
 });
 
-function syncGeofence(geojson: unknown) {
-  return fetch(`${server.baseUrl}/api/v1/zones/sync`, {
-    method: 'POST',
+function syncGeofence(area: unknown) {
+  return fetch(`${server.baseUrl}/api/v1/geofences/1`, {
+    method: 'PUT',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
-    body: JSON.stringify({
-      id: 1,
-      entity_id: 'r1',
-      entity_type: 'restaurant',
-      geojson,
-      is_active: true,
-    }),
+    body: JSON.stringify({ entity_id: 'r1', entity_type: 'restaurant', area, is_active: true }),
   });
 }

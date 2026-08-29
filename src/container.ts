@@ -1,12 +1,10 @@
 import type { Pool } from 'pg';
 import type { Config } from './config/index.ts';
 import { TaggedCache } from './lib/tagged-cache.ts';
-import { CollectionRepository } from './repositories/collection.repository.ts';
 import { CredentialRepository } from './repositories/credential.repository.ts';
 import { EntityRepository } from './repositories/entity.repository.ts';
 import { HealthRepository } from './repositories/health.repository.ts';
 import { GeofenceRepository } from './repositories/geofence.repository.ts';
-import { CollectionService } from './services/collection.service.ts';
 import { CredentialService } from './services/credential.service.ts';
 import { EntityService } from './services/entity.service.ts';
 import { HealthService } from './services/health.service.ts';
@@ -19,7 +17,6 @@ export interface Services {
   geofences: GeofenceService;
   credentials: CredentialService;
   routing: RoutingService;
-  collections: CollectionService;
   health: HealthService;
 }
 
@@ -39,7 +36,6 @@ export function buildServices(pool: Pool, config: Config): Services {
     geofences: new GeofenceService(new GeofenceRepository(pool), spatialCache),
     credentials: new CredentialService(new CredentialRepository(pool)),
     routing: new RoutingService(entityRepository, config.osrmUrl),
-    collections: new CollectionService(new CollectionRepository(pool)),
     health: new HealthService(new HealthRepository(pool), config.osrmUrl),
   };
 }

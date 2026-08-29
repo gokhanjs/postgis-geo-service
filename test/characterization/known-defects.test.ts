@@ -49,10 +49,10 @@ describe('F-01: geofence ownership stops at the tenant boundary', () => {
 
     // And tenant B still finds the geofence it registered.
     const bLooksForItsZone = await fetch(
-      `${server.baseUrl}/api/v1/zones/check?lat=41.0&lng=29.0&entity_type=restaurant`,
+      `${server.baseUrl}/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant`,
       { headers: { 'x-api-key': keyB } },
     );
-    expect(await bLooksForItsZone.json()).toEqual([{ entity_id: 'b-restaurant' }]);
+    expect(await bLooksForItsZone.json()).toEqual({ results: [{ entity_id: 'b-restaurant' }] });
   });
 
   it('leaves another tenant geofence untouched when the same id is re-synced', async () => {
@@ -100,22 +100,21 @@ describe('F-03: invalid geometry is refused at the door', () => {
 
     // The read path still answers for this tenant and type.
     const check = await fetch(
-      `${server.baseUrl}/api/v1/zones/check?lat=41.05&lng=29.05&entity_type=restaurant`,
+      `${server.baseUrl}/api/v1/geofences/containing?lat=41.05&lng=29.05&entity_type=restaurant`,
       { headers: { 'x-api-key': key } },
     );
     expect(check.status).toBe(200);
   });
 });
 
-function syncZone(apiKey: string, id: number, entityId: string, geojson: unknown) {
-  return fetch(`${server.baseUrl}/api/v1/zones/sync`, {
-    method: 'POST',
+function syncZone(apiKey: string, id: number, entityId: string, area: unknown) {
+  return fetch(`${server.baseUrl}/api/v1/geofences/${id}`, {
+    method: 'PUT',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
     body: JSON.stringify({
-      id,
       entity_id: entityId,
       entity_type: 'restaurant',
-      geojson,
+      area,
       is_active: true,
     }),
   });

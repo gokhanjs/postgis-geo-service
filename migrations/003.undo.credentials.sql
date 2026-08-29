@@ -1,3 +1,2 @@
-DROP TABLE IF EXISTS collection_tokens;
 DROP TABLE IF EXISTS admin_tokens;
 DROP TABLE IF EXISTS api_keys;

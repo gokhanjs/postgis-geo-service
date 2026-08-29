@@ -1,10 +1,5 @@
 import { queryOsrmTable, type Coordinate } from '../lib/osrm-client.ts';
-import type { EntityRepository } from '../repositories/entity.repository.ts';
-
-export interface DestinationRef {
-  entity_id: string;
-  entity_type: string;
-}
+import type { DestinationRef, EntityRepository } from '../repositories/entity.repository.ts';
 
 export interface RoutedDestination extends DestinationRef {
   road_distance_km: number | null;
@@ -32,10 +27,7 @@ export class RoutingService {
   ): Promise<RoutingResult> {
     if (this.#osrmUrl === null) return { status: 'disabled' };
 
-    const entityIds = destinations.map((d) => d.entity_id);
-    const entityTypes = [...new Set(destinations.map((d) => d.entity_type))];
-
-    const locations = await this.#entities.findCoordinates(tenantId, entityIds, entityTypes);
+    const locations = await this.#entities.findCoordinates(tenantId, destinations);
     if (locations.length === 0) return { status: 'ok', destinations: [] };
 
     const table = await queryOsrmTable(this.#osrmUrl, origin, locations);
@@ -46,14 +38,31 @@ export class RoutingService {
     const distances = table.distances[0] ?? [];
     const durations = table.durations[0] ?? [];
 
+    // Answer in the order the caller asked, keyed by identity rather than by
+    // array position: the query returns only the destinations that exist.
+    const byKey = new Map(
+      locations.map((location, i) => [
+        `${location.entity_type}\x00${location.entity_id}`,
+        {
+          entity_id: location.entity_id,
+          entity_type: location.entity_type,
+          road_distance_km: toKilometres(distances[i + 1]),
+          duration_min: toMinutes(durations[i + 1]),
+        },
+      ]),
+    );
+
     return {
       status: 'ok',
-      destinations: locations.map((location, i) => ({
-        entity_id: location.entity_id,
-        entity_type: location.entity_type,
-        road_distance_km: toKilometres(distances[i + 1]),
-        duration_min: toMinutes(durations[i + 1]),
-      })),
+      destinations: destinations.map(
+        (wanted) =>
+          byKey.get(`${wanted.entity_type}\x00${wanted.entity_id}`) ?? {
+            entity_id: wanted.entity_id,
+            entity_type: wanted.entity_type,
+            road_distance_km: null,
+            duration_min: null,
+          },
+      ),
     };
   }
 }

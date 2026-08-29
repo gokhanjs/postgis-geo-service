@@ -1,5 +1,5 @@
 import type { TaggedCache } from '../lib/tagged-cache.ts';
-import type { NearbyRow } from '../repositories/entity.repository.ts';
+import type { NearbyPage } from './entity.service.ts';
 import type { GeofenceMatch } from '../repositories/geofence.repository.ts';
 
 /**
@@ -7,7 +7,7 @@ import type { GeofenceMatch } from '../repositories/geofence.repository.ts';
  * reader confirm the shape rather than trusting key prefixes not to collide.
  */
 export type SpatialCacheValue =
-  | { kind: 'nearby'; rows: NearbyRow[] }
+  | { kind: 'nearby'; page: NearbyPage }
   | { kind: 'geofenceMatches'; rows: GeofenceMatch[] }
   | { kind: 'geofenceCheck'; inside: boolean };
 

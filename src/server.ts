@@ -40,9 +40,6 @@ try {
   await app.services.health.checkDatabase();
   app.log.info('Database connection established');
 
-  const purged = await app.services.collections.purgeExpired();
-  if (purged > 0) app.log.info(`Purged ${purged} expired collection tokens`);
-
   await app.listen({ port: config.port, host: '0.0.0.0' });
 } catch (err) {
   app.log.error({ err }, 'Startup failed');

@@ -1,31 +1,48 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { EntitySyncBody, NearbyQuery } from '../schemas/index.ts';
+import { EntityBody, EntityPathParams, NearbyQuery, NearbyResponse } from '../schemas/index.ts';
 
 const entityRoutes: FastifyPluginAsyncTypebox = async (app) => {
-  app.post(
-    '/api/v1/entities/sync',
-    { preHandler: [app.authenticateApiKey], schema: { body: EntitySyncBody } },
+  app.put(
+    '/api/v1/entities/:type/:id',
+    {
+      preHandler: [app.authenticateApiKey],
+      schema: {
+        tags: ['entities'],
+        summary: 'Create or replace the location of one entity',
+        params: EntityPathParams,
+        body: EntityBody,
+      },
+    },
     async (request) => {
-      const { entity_id, entity_type, lat, lng, is_active } = request.body;
+      const { type, id } = request.params;
+      const { lat, lng, is_active } = request.body;
 
       await app.services.entities.syncLocation({
-        entityId: entity_id,
-        entityType: entity_type,
+        entityId: id,
+        entityType: type,
         tenantId: request.tenant.tenant_id,
         lat,
         lng,
         isActive: is_active,
       });
 
-      return { success: true };
+      return { entity_id: id, entity_type: type };
     },
   );
 
   app.get(
     '/api/v1/entities/nearby',
-    { preHandler: [app.authenticateApiKey], schema: { querystring: NearbyQuery } },
+    {
+      preHandler: [app.authenticateApiKey],
+      schema: {
+        tags: ['entities'],
+        summary: 'Find entities of one type within a radius, nearest first',
+        querystring: NearbyQuery,
+        response: { 200: NearbyResponse },
+      },
+    },
     async (request) => {
-      const { lat, lng, entity_type, radius_km } = request.query;
+      const { lat, lng, entity_type, radius_km, limit, cursor } = request.query;
 
       return app.services.entities.findNearby({
         tenantId: request.tenant.tenant_id,
@@ -33,6 +50,8 @@ const entityRoutes: FastifyPluginAsyncTypebox = async (app) => {
         lat,
         lng,
         radiusKm: radius_km,
+        limit,
+        cursor,
       });
     },
   );

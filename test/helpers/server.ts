@@ -34,7 +34,7 @@ async function waitForHealth(baseUrl: string, child: ChildProcess): Promise<void
       throw new Error(`Server exited early with code ${child.exitCode}`);
     }
     try {
-      const res = await fetch(`${baseUrl}/health`);
+      const res = await fetch(`${baseUrl}/health/live`);
       if (res.ok) return;
     } catch {
       // Not listening yet.

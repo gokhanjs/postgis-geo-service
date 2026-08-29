@@ -1,17 +1,25 @@
 import { Type } from '@sinclair/typebox';
 
-const Latitude = Type.Number({ minimum: -90, maximum: 90 });
-const Longitude = Type.Number({ minimum: -180, maximum: 180 });
-const EntityId = Type.String({ minLength: 1, maxLength: 100 });
-const EntityType = Type.String({ minLength: 1, maxLength: 100 });
+const Latitude = Type.Number({ minimum: -90, maximum: 90, description: 'WGS 84 latitude.' });
+const Longitude = Type.Number({ minimum: -180, maximum: 180, description: 'WGS 84 longitude.' });
+const EntityId = Type.String({
+  minLength: 1,
+  maxLength: 100,
+  description: "The identifier this entity has in the caller's own system.",
+});
+const EntityType = Type.String({
+  minLength: 1,
+  maxLength: 100,
+  description: 'Caller-defined category, for example "restaurant" or "courier".',
+});
 
-export const EntitySyncBody = Type.Object(
+export const EntityPathParams = Type.Object({ type: EntityType, id: EntityId });
+
+export const EntityBody = Type.Object(
   {
-    entity_id: EntityId,
-    entity_type: EntityType,
     lat: Latitude,
     lng: Longitude,
-    is_active: Type.Boolean(),
+    is_active: Type.Boolean({ description: 'Inactive entities are excluded from every search.' }),
   },
   { additionalProperties: false },
 );
@@ -22,24 +30,45 @@ export const NearbyQuery = Type.Object(
     lng: Longitude,
     entity_type: EntityType,
     radius_km: Type.Number({ minimum: 0.1, maximum: 50, default: 5 }),
+    limit: Type.Integer({ minimum: 1, maximum: 500, default: 100 }),
+    cursor: Type.Optional(
+      Type.String({ description: 'The next_cursor from a previous page of results.' }),
+    ),
   },
   { additionalProperties: false },
 );
 
-export const ZoneSyncBody = Type.Object(
+export const NearbyResponse = Type.Object({
+  results: Type.Array(
+    Type.Object({
+      entity_id: Type.String(),
+      distance_km: Type.Number(),
+    }),
+  ),
+  next_cursor: Type.Union([Type.String(), Type.Null()]),
+});
+
+export const GeofencePathParams = Type.Object({
+  id: Type.Integer({ description: "The geofence's identifier in the caller's own system." }),
+});
+
+export const GeofenceBody = Type.Object(
   {
-    id: Type.Integer(),
     entity_id: EntityId,
     entity_type: EntityType,
-    geojson: Type.Object({}, { additionalProperties: true }),
+    area: Type.Object(
+      {
+        type: Type.Literal('Polygon'),
+        coordinates: Type.Array(Type.Array(Type.Array(Type.Number()))),
+      },
+      { additionalProperties: false, description: 'RFC 7946 Polygon.' },
+    ),
     is_active: Type.Boolean(),
   },
   { additionalProperties: false },
 );
 
-export const ZoneIdParams = Type.Object({ id: Type.Integer() });
-
-export const ZoneCheckQuery = Type.Object(
+export const ContainingQuery = Type.Object(
   {
     lat: Latitude,
     lng: Longitude,
@@ -71,6 +100,17 @@ export const AdminKeyBody = Type.Object(
   { additionalProperties: false },
 );
 
-export const AdminKeyParams = Type.Object({ key: Type.String() });
+export const AdminKeyParams = Type.Object({
+  prefix: Type.String({ description: 'The key_prefix shown when listing keys.' }),
+});
 
-export const TokenParams = Type.Object({ token: Type.String() });
+export const ProblemResponse = Type.Object(
+  {
+    type: Type.String(),
+    title: Type.String(),
+    status: Type.Integer(),
+    detail: Type.Optional(Type.String()),
+    instance: Type.Optional(Type.String()),
+  },
+  { description: 'RFC 9457 problem details.' },
+);

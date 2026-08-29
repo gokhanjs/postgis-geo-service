@@ -5,9 +5,9 @@ import { buildServices } from './container.ts';
 import databasePlugin from './plugins/database.ts';
 import authPlugin from './plugins/auth.ts';
 import errorHandlerPlugin from './plugins/error-handler.ts';
+import openapiPlugin from './plugins/openapi.ts';
 import securityPlugin from './plugins/security.ts';
 import adminRoutes from './routes/admin.ts';
-import collectionRoutes from './routes/collection.ts';
 import entityRoutes from './routes/entities.ts';
 import healthRoutes from './routes/health.ts';
 import routingRoutes from './routes/routing.ts';
@@ -39,6 +39,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(databasePlugin);
   app.decorate('services', buildServices(app.pg, config));
 
+  await app.register(openapiPlugin);
   await app.register(securityPlugin);
   await app.register(authPlugin);
 
@@ -47,7 +48,6 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(entityRoutes);
   await app.register(geofenceRoutes);
   await app.register(routingRoutes);
-  await app.register(collectionRoutes);
 
   return app;
 }
