@@ -1,3 +1,7 @@
 dist/
 coverage/
 pnpm-lock.yaml
+
+# Local working state. Prettier reads this project's .gitignore but cannot see
+# the global excludes file that actually covers .local/, so it needs saying here.
+.local/

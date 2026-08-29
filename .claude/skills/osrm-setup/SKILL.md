@@ -13,11 +13,11 @@ Routing is optional here: without `OSRM_URL` the `/routing` endpoints answer
 **Which region.** Extracts come from [Geofabrik](https://download.geofabrik.de/).
 Size drives everything downstream:
 
-| Extract | Download | RAM to process | Time |
-|---|---|---|---|
-| Monaco | ~600 KB | negligible | seconds |
-| A small country | 200-600 MB | 4-8 GB | 10-30 min |
-| A large country | 1-4 GB | 16-32 GB | hours |
+| Extract         | Download   | RAM to process | Time      |
+| --------------- | ---------- | -------------- | --------- |
+| Monaco          | ~600 KB    | negligible     | seconds   |
+| A small country | 200-600 MB | 4-8 GB         | 10-30 min |
+| A large country | 1-4 GB     | 16-32 GB       | hours     |
 
 Processing is memory-bound and will be killed by the OOM reaper rather than
 fail cleanly. If unsure, start with Monaco to prove the wiring, then swap.
