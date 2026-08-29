@@ -1,11 +1,12 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { problems } from '../lib/problem.ts';
 import { ZoneCheckQuery, ZoneIdParams, ZoneSyncBody } from '../schemas/index.ts';
 
 const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.post(
     '/api/v1/zones/sync',
     { preHandler: [app.authenticateApiKey], schema: { body: ZoneSyncBody } },
-    async (request, reply) => {
+    async (request) => {
       const { id, entity_id, entity_type, geojson, is_active } = request.body;
 
       const rejection = await app.services.geofences.sync({
@@ -17,7 +18,7 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
         isActive: is_active,
       });
 
-      if (rejection !== null) return reply.code(400).send({ error: rejection });
+      if (rejection !== null) throw problems.invalidGeometry(rejection);
 
       return { success: true };
     },
@@ -26,13 +27,13 @@ const geofenceRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.delete(
     '/api/v1/zones/:id',
     { preHandler: [app.authenticateApiKey], schema: { params: ZoneIdParams } },
-    async (request, reply) => {
+    async (request) => {
       const deleted = await app.services.geofences.delete(
         request.params.id,
         request.tenant.tenant_id,
       );
 
-      if (!deleted) return reply.code(404).send({ error: 'Zone not found' });
+      if (!deleted) throw problems.notFound('Geofence');
 
       return { success: true };
     },

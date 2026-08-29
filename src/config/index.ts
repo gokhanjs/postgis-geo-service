@@ -1,11 +1,5 @@
 import 'dotenv/config';
 
-/**
- * Reads and validates the environment once, at import time, so a
- * misconfiguration fails at startup rather than on the first request that
- * happens to need the missing value.
- */
-
 const REQUIRED = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME'] as const;
 
 function requireEnv(): void {
@@ -18,13 +12,32 @@ function requireEnv(): void {
 
 requireEnv();
 
-function parseAllowedIps(raw: string | undefined): Set<string> | null {
-  if (!raw) return null;
-  const ips = raw
+function parseList(raw: string | undefined): string[] | null {
+  if (raw === undefined) return null;
+  const items = raw
     .split(',')
-    .map((ip) => ip.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
-  return ips.length > 0 ? new Set(ips) : null;
+  return items.length > 0 ? items : null;
+}
+
+/**
+ * How many proxies sit in front of the service.
+ *
+ * A boolean `true` would trust the whole X-Forwarded-For chain, and the common
+ * nginx setup appends rather than overwrites, so a client could put any address
+ * at the head of the list and walk past both the allowlist and the rate limit.
+ * A hop count makes only the proxies we actually run authoritative.
+ */
+function parseTrustProxy(
+  raw: string | undefined,
+): false | ((addr: string, hop: number) => boolean) {
+  if (raw === undefined) return false;
+
+  const hops = Number.parseInt(raw, 10);
+  if (!Number.isInteger(hops) || hops <= 0) return false;
+
+  return (_addr, hop) => hop < hops;
 }
 
 export const config = {
@@ -45,13 +58,22 @@ export const config = {
   osrmUrl: process.env.OSRM_URL ?? null,
 
   /** Absent means no network restriction. */
-  allowedIps: parseAllowedIps(process.env.ALLOWED_IPS),
+  allowedIps: (() => {
+    const ips = parseList(process.env.ALLOWED_IPS);
+    return ips === null ? null : new Set(ips);
+  })(),
 
-  trustProxy: process.env.TRUST_PROXY === 'true',
+  /** Absent disables cross-origin requests, which is right for a service API. */
+  corsOrigins: parseList(process.env.CORS_ORIGINS),
+
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY_HOPS),
+
+  /** Fastify's own default is 1 MB; a polygon body has no business exceeding this. */
+  bodyLimit: Number.parseInt(process.env.BODY_LIMIT_BYTES ?? '262144', 10),
 
   rateLimit: {
-    max: 100,
-    timeWindow: 60_000,
+    max: Number.parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
+    timeWindow: Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
   },
 
   cache: {

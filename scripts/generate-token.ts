@@ -1,15 +1,10 @@
 import 'dotenv/config';
-import { randomBytes } from 'node:crypto';
 import pg from 'pg';
-
-const TOKEN_BYTES = 32;
+import { generateAdminToken } from '../src/lib/credentials.ts';
 
 /**
- * Rotates the admin token.
- *
- * There is exactly one live admin token, so issuing a new one revokes the
- * previous one in the same transaction. The value is printed once and never
- * stored anywhere this script can read back.
+ * Rotates the admin token. Only the digest is stored, so the value printed
+ * here cannot be recovered from the database afterwards.
  */
 async function main(): Promise<void> {
   const pool = new pg.Pool({
@@ -20,13 +15,13 @@ async function main(): Promise<void> {
     database: process.env.DB_NAME,
   });
 
-  const token = `gat_${randomBytes(TOKEN_BYTES).toString('hex')}`;
+  const { token, hash } = generateAdminToken();
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM admin_tokens');
-    await client.query('INSERT INTO admin_tokens (token) VALUES ($1)', [token]);
+    await client.query('INSERT INTO admin_tokens (token_hash) VALUES ($1)', [hash]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

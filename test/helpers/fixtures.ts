@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
 import type { Pool } from 'pg';
+import { generateApiKey, hashCredential } from '../../src/lib/credentials.ts';
 
 export const ADMIN_TOKEN = 'gat_test_admin_token';
 
@@ -8,7 +8,9 @@ export async function resetDatabase(pool: Pool): Promise<void> {
   await pool.query(
     'TRUNCATE entity_locations, geofences, api_keys, admin_tokens, collection_tokens',
   );
-  await pool.query('INSERT INTO admin_tokens (token) VALUES ($1)', [ADMIN_TOKEN]);
+  await pool.query('INSERT INTO admin_tokens (token_hash) VALUES ($1)', [
+    hashCredential(ADMIN_TOKEN),
+  ]);
 }
 
 /** Issues an API key bound to a tenant, mirroring what the admin endpoint does. */
@@ -17,13 +19,12 @@ export async function createApiKey(
   tenantId: number,
   projectName = 'acme-delivery',
 ): Promise<string> {
-  const key = `gsk_${randomBytes(24).toString('hex')}`;
-  await pool.query('INSERT INTO api_keys (key, tenant_id, project_name) VALUES ($1, $2, $3)', [
-    key,
-    tenantId,
-    projectName,
-  ]);
-  return key;
+  const issued = generateApiKey();
+  await pool.query(
+    'INSERT INTO api_keys (key_hash, key_prefix, tenant_id, project_name) VALUES ($1, $2, $3, $4)',
+    [issued.hash, issued.prefix, tenantId, projectName],
+  );
+  return issued.key;
 }
 
 /** A small square polygon centred on the given point, as GeoJSON. */

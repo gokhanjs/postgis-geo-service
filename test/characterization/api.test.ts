@@ -3,13 +3,8 @@ import { startTestServer, type TestServer } from '../helpers/server.js';
 import { ADMIN_TOKEN, createApiKey, resetDatabase, squarePolygon } from '../helpers/fixtures.js';
 
 /**
- * Records the behaviour of the service as it exists today, before the refactor.
- *
- * These assertions are deliberately written against the HTTP contract rather
- * than the source layout, so they keep running unchanged while server.js is
- * split into layers. Where current behaviour is a known defect the test says
- * so and points at the finding; the phase that fixes it flips the assertion,
- * which makes every behaviour change visible in a diff instead of silent.
+ * The service's HTTP contract, asserted against the wire rather than the source
+ * layout so the suite survives internal restructuring. Errors follow RFC 9457.
  */
 
 const TENANT_A = 1;
@@ -59,7 +54,8 @@ describe('authentication', () => {
   it('rejects a spatial request with no API key', async () => {
     const res = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant');
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Missing x-api-key header' });
+    expect(res.headers.get('content-type')).toContain('application/problem+json');
+    expect(await res.json()).toMatchObject({ status: 401, title: 'Missing API key' });
   });
 
   it('rejects an unknown API key', async () => {
@@ -68,7 +64,7 @@ describe('authentication', () => {
       'gsk_nope',
     );
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Invalid or inactive API key' });
+    expect(await res.json()).toMatchObject({ status: 401, title: 'Invalid or inactive API key' });
   });
 
   it('rejects an admin request with no admin token', async () => {
@@ -88,13 +84,16 @@ describe('admin key management', () => {
     const issued = (await created.json()) as { key: string };
     expect(issued.key).toMatch(/^gsk_[0-9a-f]{48}$/);
 
+    // Listing shows a prefix, never the key: the stored value is a digest.
     const listed = await fetch(`${server.baseUrl}/api/v1/admin/keys`, {
       headers: { 'x-admin-token': ADMIN_TOKEN },
     });
-    const rows = (await listed.json()) as Array<{ key: string }>;
-    expect(rows.some((r) => r.key === issued.key)).toBe(true);
+    const rows = (await listed.json()) as Array<{ key_prefix: string; key?: string }>;
+    const match = rows.find((r) => r.key_prefix === issued.key.slice(0, 12));
+    expect(match).toBeDefined();
+    expect(match?.key).toBeUndefined();
 
-    const revoked = await fetch(`${server.baseUrl}/api/v1/admin/keys/${issued.key}`, {
+    const revoked = await fetch(`${server.baseUrl}/api/v1/admin/keys/${issued.key.slice(0, 12)}`, {
       method: 'DELETE',
       headers: { 'x-admin-token': ADMIN_TOKEN },
     });
@@ -270,9 +269,9 @@ describe('routing', () => {
       { 'x-api-key': keyA },
     );
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({
-      error: 'Routing service not configured',
-      osrm: 'disabled',
+    expect(await res.json()).toMatchObject({
+      status: 503,
+      title: 'Routing is not configured',
     });
   });
 });

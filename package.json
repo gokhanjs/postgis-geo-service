@@ -25,6 +25,7 @@
     "osrm:update": "node scripts/osrm-update.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/type-provider-typebox": "^6.1.0",

@@ -1,5 +1,6 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import { problems } from '../lib/problem.ts';
 import type { TenantContext } from '../repositories/credential.repository.ts';
 
 /**
@@ -25,28 +26,22 @@ export default fp(
       },
     });
 
-    app.decorate('authenticateApiKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.decorate('authenticateApiKey', async (request: FastifyRequest) => {
       const key = request.headers['x-api-key'];
-      if (typeof key !== 'string' || key.length === 0) {
-        return reply.code(401).send({ error: 'Missing x-api-key header' });
-      }
+      if (typeof key !== 'string' || key.length === 0) throw problems.missingApiKey();
 
       const tenant = await app.services.credentials.resolveTenant(key);
-      if (tenant === null) {
-        return reply.code(401).send({ error: 'Invalid or inactive API key' });
-      }
+      if (tenant === null) throw problems.invalidApiKey();
 
       request.tenantContext = tenant;
     });
 
-    app.decorate('authenticateAdmin', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.decorate('authenticateAdmin', async (request: FastifyRequest) => {
       const token = request.headers['x-admin-token'];
-      if (typeof token !== 'string' || token.length === 0) {
-        return reply.code(401).send({ error: 'Missing x-admin-token header' });
-      }
+      if (typeof token !== 'string' || token.length === 0) throw problems.missingAdminToken();
 
       if (!(await app.services.credentials.isValidAdminToken(token))) {
-        return reply.code(401).send({ error: 'Invalid admin token' });
+        throw problems.invalidAdminToken();
       }
     });
   },

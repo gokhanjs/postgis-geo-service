@@ -1,11 +1,12 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { problems } from '../lib/problem.ts';
 import { RoutingBody } from '../schemas/index.ts';
 
 const routingRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.post(
     '/api/v1/routing/distances',
     { preHandler: [app.authenticateApiKey], schema: { body: RoutingBody } },
-    async (request, reply) => {
+    async (request) => {
       const { origin, destinations } = request.body;
 
       const result = await app.services.routing.distances(
@@ -16,13 +17,9 @@ const routingRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
       switch (result.status) {
         case 'disabled':
-          return reply
-            .code(503)
-            .send({ error: 'Routing service not configured', osrm: 'disabled' });
+          throw problems.routingDisabled();
         case 'unreachable':
-          return reply
-            .code(503)
-            .send({ error: 'Routing service unreachable', osrm: 'unreachable' });
+          throw problems.routingUnreachable();
         case 'ok':
           return result.destinations;
       }

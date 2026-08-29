@@ -13,6 +13,12 @@ export default fp(
   async (app) => {
     const pool = new pg.Pool(config.database);
 
+    // node-postgres emits this when an idle client drops, most often because
+    // the database restarted. Unhandled, it is an uncaught exception.
+    pool.on('error', (err) => {
+      app.log.error({ err }, 'Idle database client failed');
+    });
+
     app.decorate('pg', pool);
     app.addHook('onClose', async () => {
       await pool.end();

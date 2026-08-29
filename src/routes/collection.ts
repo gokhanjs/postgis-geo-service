@@ -1,4 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { problems } from '../lib/problem.ts';
 import { TokenParams } from '../schemas/index.ts';
 
 const collectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -8,11 +9,7 @@ const collectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
     async (request, reply) => {
       const collection = await app.services.collections.download(request.params.token);
 
-      if (collection === null) {
-        return reply
-          .code(404)
-          .send({ error: 'Link geçersiz, süresi dolmuş veya daha önce kullanılmış.' });
-      }
+      if (collection === null) throw problems.notFound('Download link');
 
       return reply
         .header('Content-Type', 'application/json')
