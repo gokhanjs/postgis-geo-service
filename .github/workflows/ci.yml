@@ -57,3 +57,27 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
+
+      # The invariants AGENTS.md states, checked rather than trusted. ESLint
+      # covers the layering rule; these are the ones it cannot express.
+      - name: Architecture invariants
+        run: |
+          set -e
+          # Casting a PARAMETER is fine and necessary; casting the indexed
+          # COLUMN inside a predicate is what defeats the GiST index.
+          if grep -rnE '\((location|area)::geography' src/ --include='*.ts'; then
+            echo "Casting the indexed column stops the GiST index being usable." >&2
+            exit 1
+          fi
+          if grep -rn 'ST_Contains' src/ --include='*.ts' | grep -vE ':\s*(//|\*)'; then
+            echo "Use ST_Covers: ST_Contains excludes shared boundaries." >&2
+            exit 1
+          fi
+          if grep -rln 'from .pg.' src/routes src/services 2>/dev/null | grep .; then
+            echo "SQL belongs in src/repositories/." >&2
+            exit 1
+          fi
+          echo "Architecture invariants hold."
+
+      - name: Build the production image
+        run: docker build -f docker/Dockerfile -t postgis-geo-service:ci .
