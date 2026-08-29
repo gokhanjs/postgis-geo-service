@@ -1,0 +1,65 @@
+name: postgis-geo-service
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+      POSTGRES_DB: ${DB_NAME:-geo_service}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-geo_service}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Downloads and preprocesses an OSM extract. Runs once, then exits.
+  # Reprocessing only happens when the .osrm files are missing from the volume.
+  osrm-init:
+    profiles: ['routing']
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    volumes:
+      - osrm-data:/data
+    environment:
+      OSRM_REGION_NAME: ${OSRM_REGION_NAME:-monaco}
+      OSRM_REGION_URL: ${OSRM_REGION_URL:-https://download.geofabrik.de/europe/monaco-latest.osm.pbf}
+    entrypoint: ['/bin/bash', '-c']
+    command:
+      - |
+        set -euo pipefail
+        cd /data
+        if [ -f "$${OSRM_REGION_NAME}.osrm.mldgr" ]; then
+          echo "[osrm-init] $${OSRM_REGION_NAME} already processed, skipping."
+          exit 0
+        fi
+        echo "[osrm-init] downloading $${OSRM_REGION_URL}"
+        curl -fsSL -o "$${OSRM_REGION_NAME}.osm.pbf" "$${OSRM_REGION_URL}"
+        osrm-extract -p /opt/car.lua "$${OSRM_REGION_NAME}.osm.pbf"
+        osrm-partition "$${OSRM_REGION_NAME}.osrm"
+        osrm-customize "$${OSRM_REGION_NAME}.osrm"
+        echo "[osrm-init] done."
+
+  osrm:
+    profiles: ['routing']
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    restart: unless-stopped
+    depends_on:
+      osrm-init:
+        condition: service_completed_successfully
+    volumes:
+      - osrm-data:/data
+    ports:
+      - '${OSRM_PORT:-5000}:5000'
+    command: >
+      osrm-routed --algorithm mld
+      /data/${OSRM_REGION_NAME:-monaco}.osrm
+
+volumes:
+  pgdata:
+  osrm-data:
