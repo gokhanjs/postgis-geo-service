@@ -37,20 +37,16 @@ CI runs exactly this against a PostGIS service container.
 
 ## The `.claude/` directory
 
-It holds two different things, and `.gitignore` keeps them apart.
+It holds one thing: agent tooling meant for contributors. `agents/`,
+`commands/`, `skills/` and `settings.json` are published; `settings.local.json`
+is personal and is not.
 
-Published, because contributors and coding agents use them: `agents/`,
-`commands/`, `skills/`, `settings.json`.
+Anyone's own working state, if they keep any, belongs outside it. Nothing here
+depends on that, so there is no rule for it in this repository.
 
-Private, because it is one person's working state: session notes, handoffs,
-plans, audit reports, `settings.local.json`. Everything not on the allowlist is
-ignored, so a file a tool creates later is private by default rather than by
-someone remembering to add it.
-
-If you keep `.claude/` in a global gitignore, use `.claude/*` rather than
-`.claude/`. The directory form stops git descending at all, which silently
-kills the allowlist above and makes the published files look committed when
-they are not.
+If you keep `.claude/` in a global gitignore, write it as `.claude/*`. The bare
+directory form stops git descending at all, which makes the re-includes above
+do nothing and makes force-added files look tracked when they are not.
 
 ## Commits
 

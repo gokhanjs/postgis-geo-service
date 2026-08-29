@@ -3,13 +3,9 @@ node_modules/
 dist/
 coverage/
 
-# Everything under .claude/ is local working state by default: session notes,
-# handoffs, plans, audit reports. Only the tooling meant for contributors is
-# re-included below, so anything a tool creates later is private unless it is
-# deliberately added here.
-.claude/*
+# This project publishes its agent tooling. Everything else under .claude/ is
+# private, and local working state lives in .local/, both covered globally.
 !.claude/agents/
 !.claude/commands/
 !.claude/skills/
 !.claude/settings.json
-.claude/settings.local.json
