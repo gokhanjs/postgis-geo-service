@@ -92,6 +92,27 @@ describe('rate limiting', () => {
     expect(other.status).toBe(200);
   });
 
+  it('lets a tenant that keeps calling back in once its window ends', async () => {
+    const metered = await startTestServer({ RATE_LIMIT_MAX: '3', RATE_LIMIT_WINDOW_MS: '1000' });
+    try {
+      const steady = await createApiKey(metered.pool, 93, 'quota-steady');
+      const url = `${metered.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=site`;
+
+      const statuses: number[] = [];
+      for (let i = 0; i < 12; i += 1) {
+        const res = await fetch(url, { headers: { 'x-api-key': steady } });
+        statuses.push(res.status);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      expect(statuses.slice(0, 3)).toEqual([200, 200, 200]);
+      expect(statuses).toContain(429);
+      expect(statuses.slice(5)).toContain(200);
+    } finally {
+      await metered.stop();
+    }
+  });
+
   it('meters an IPv6 /64 as one address, so rotating within it gains nothing', async () => {
     const proxied = await startTestServer({ TRUST_PROXY_HOPS: '1', RATE_LIMIT_IP_MAX: '3' });
     try {

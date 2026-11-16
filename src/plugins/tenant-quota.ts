@@ -9,6 +9,8 @@ export default fp(
     const used = new LRUCache<number, number>({
       max: 10_000,
       ttl: config.rateLimit.timeWindow,
+      // A fixed window: refreshing the TTL on every charge would never let a steady caller back in.
+      noUpdateTTL: true,
     });
 
     app.decorate('chargeTenantQuota', (tenantId: number) => {
