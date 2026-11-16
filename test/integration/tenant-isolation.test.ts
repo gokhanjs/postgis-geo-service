@@ -5,7 +5,7 @@ import { adminPoolConfig, appPoolConfig } from '../helpers/env.js';
 /**
  * Proves tenant isolation is a database guarantee rather than a convention.
  * Every query here deliberately omits a tenant predicate: what keeps the rows
- * apart is the policy, not the SQL.
+ * apart is the tenant view, not the SQL.
  */
 
 let admin: pg.Pool;
@@ -64,17 +64,28 @@ describe('row-level security', () => {
     const { rows } = await admin.query('SELECT entity_id FROM entity_locations');
     expect(rows).toHaveLength(2);
   });
+});
+
+describe('tenant views', () => {
+  it('give the service role no direct access to the tables', async () => {
+    await expect(asTenant(1, 'SELECT entity_id FROM entity_locations')).rejects.toThrow(
+      /permission denied/i,
+    );
+    await expect(asTenant(1, 'SELECT entity_id FROM geofences')).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
 
   it('returns nothing when the connection carries no tenant', async () => {
-    const { rows } = await asTenant(null, 'SELECT entity_id FROM entity_locations');
+    const { rows } = await asTenant(null, 'SELECT entity_id FROM tenant_entity_locations');
     expect(rows).toEqual([]);
   });
 
   it('shows a tenant only its own rows, with no WHERE clause in the query', async () => {
-    const first = await asTenant(1, 'SELECT entity_id FROM entity_locations');
+    const first = await asTenant(1, 'SELECT entity_id FROM tenant_entity_locations');
     expect(first.rows).toEqual([{ entity_id: 'a1' }]);
 
-    const second = await asTenant(2, 'SELECT entity_id FROM entity_locations');
+    const second = await asTenant(2, 'SELECT entity_id FROM tenant_entity_locations');
     expect(second.rows).toEqual([{ entity_id: 'b1' }]);
   });
 
@@ -82,20 +93,20 @@ describe('row-level security', () => {
     await expect(
       asTenant(
         1,
-        `INSERT INTO entity_locations (entity_id, entity_type, tenant_id, location)
+        `INSERT INTO tenant_entity_locations (entity_id, entity_type, tenant_id, location)
          VALUES ('smuggled', 'restaurant', 2, ST_Point(1, 1, 4326)::geography)`,
       ),
-    ).rejects.toThrow(/row-level security/i);
+    ).rejects.toThrow(/check option/i);
   });
 
   it('cannot update or delete another tenant row', async () => {
     const updated = await asTenant(
       1,
-      "UPDATE entity_locations SET is_active = false WHERE entity_id = 'b1'",
+      "UPDATE tenant_entity_locations SET is_active = false WHERE entity_id = 'b1'",
     );
     expect(updated.rowCount).toBe(0);
 
-    const deleted = await asTenant(1, "DELETE FROM entity_locations WHERE entity_id = 'b1'");
+    const deleted = await asTenant(1, "DELETE FROM tenant_entity_locations WHERE entity_id = 'b1'");
     expect(deleted.rowCount).toBe(0);
 
     const { rows } = await admin.query(
@@ -106,7 +117,7 @@ describe('row-level security', () => {
 });
 
 /**
- * Above proves the policies are right; this proves the application drives them
+ * Above proves the views are right; this proves the application drives them
  * right, through the real HTTP surface on every read path.
  */
 describe('isolation through the running service', () => {

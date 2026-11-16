@@ -50,7 +50,7 @@ export class EntityRepository {
     await withTenant(this.#pool, input.tenantId, async (client) => {
       await client.query(
         `
-        INSERT INTO entity_locations (entity_id, entity_type, tenant_id, location, is_active)
+        INSERT INTO tenant_entity_locations (entity_id, entity_type, tenant_id, location, is_active)
         VALUES ($1, $2, $3, ST_Point($4, $5, 4326)::geography, $6)
         ON CONFLICT (entity_id, entity_type, tenant_id)
         DO UPDATE SET
@@ -72,7 +72,7 @@ export class EntityRepository {
         `
         SELECT entity_id,
                ROUND((ST_Distance(location, $1::geography) / 1000)::numeric, 3) AS distance_km
-        FROM entity_locations
+        FROM tenant_entity_locations
         WHERE is_active
           AND entity_type = $2
           AND tenant_id   = $3
@@ -117,7 +117,7 @@ export class EntityRepository {
         SELECT e.entity_id, e.entity_type,
                ST_X(e.location::geometry) AS lng,
                ST_Y(e.location::geometry) AS lat
-        FROM   entity_locations e
+        FROM   tenant_entity_locations e
         JOIN   unnest($2::text[], $3::text[]) AS wanted(entity_id, entity_type)
           ON   e.entity_id = wanted.entity_id AND e.entity_type = wanted.entity_type
         WHERE  e.tenant_id = $1

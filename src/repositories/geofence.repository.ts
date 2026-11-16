@@ -30,13 +30,13 @@ export class GeofenceRepository {
   async upsert(input: GeofenceInput): Promise<string | null> {
     return withTenant(this.#pool, input.tenantId, async (client) => {
       const { rows: existing } = await client.query<{ entity_type: string }>(
-        'SELECT entity_type FROM geofences WHERE tenant_id = $1 AND external_id = $2',
+        'SELECT entity_type FROM tenant_geofences WHERE tenant_id = $1 AND external_id = $2',
         [input.tenantId, input.externalId],
       );
 
       await client.query(
         `
-        INSERT INTO geofences (external_id, entity_id, entity_type, tenant_id, area, is_active)
+        INSERT INTO tenant_geofences (external_id, entity_id, entity_type, tenant_id, area, is_active)
         VALUES ($1, $2, $3, $4, ST_GeomFromGeoJSON($5)::geography, $6)
         ON CONFLICT (tenant_id, external_id)
         DO UPDATE SET
@@ -63,7 +63,7 @@ export class GeofenceRepository {
   async deleteByExternalId(externalId: number, tenantId: number): Promise<string | null> {
     return withTenant(this.#pool, tenantId, async (client) => {
       const { rows } = await client.query<{ entity_type: string }>(
-        'DELETE FROM geofences WHERE external_id = $1 AND tenant_id = $2 RETURNING entity_type',
+        'DELETE FROM tenant_geofences WHERE external_id = $1 AND tenant_id = $2 RETURNING entity_type',
         [externalId, tenantId],
       );
       return rows[0]?.entity_type ?? null;
@@ -81,7 +81,7 @@ export class GeofenceRepository {
       const { rows } = await client.query<{ inside: boolean }>(
         `
         SELECT EXISTS (
-          SELECT 1 FROM geofences
+          SELECT 1 FROM tenant_geofences
           WHERE is_active
             AND entity_type = $1
             AND tenant_id   = $2
@@ -107,7 +107,7 @@ export class GeofenceRepository {
       const { rows } = await client.query<GeofenceMatch>(
         `
         SELECT DISTINCT entity_id
-        FROM geofences
+        FROM tenant_geofences
         WHERE is_active
           AND entity_type = $1
           AND tenant_id   = $2
