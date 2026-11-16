@@ -4,7 +4,7 @@ const host = process.env.DB_HOST ?? '127.0.0.1';
 const port = process.env.DB_PORT ?? '5432';
 const database = process.env.TEST_DB_NAME ?? 'geo_service_test';
 
-/** The restricted role, so RLS policies actually apply to the service. */
+/** The restricted role, so the service reaches tenant data only through the tenant views. */
 export const testDbEnv = {
   DB_HOST: host,
   DB_PORT: port,

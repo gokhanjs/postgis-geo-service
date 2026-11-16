@@ -4,9 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
-// Migrations run as an owner/superuser: they create extensions, roles and
-// policies. The service itself connects as the restricted role created in 002,
-// which is the only way row-level security applies to it at all.
+// Migrations run as an owner/superuser: they create extensions, roles,
+// policies and views. The service itself connects as the restricted role from
+// 002, which can reach tenant data only through the views from 007.
 const DB_CONFIG = {
   host: process.env.DB_HOST,
   port: Number.parseInt(process.env.DB_PORT ?? '5432', 10),
