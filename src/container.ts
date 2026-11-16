@@ -1,12 +1,14 @@
 import { LRUCache } from 'lru-cache';
 import type { Pool } from 'pg';
 import type { Config } from './config/index.ts';
+import { DatasetStore } from './lib/dataset-store.ts';
 import { TaggedCache } from './lib/tagged-cache.ts';
 import { CredentialRepository } from './repositories/credential.repository.ts';
 import { EntityRepository } from './repositories/entity.repository.ts';
 import { HealthRepository } from './repositories/health.repository.ts';
 import { GeofenceRepository, type GeofenceMatch } from './repositories/geofence.repository.ts';
 import { CredentialService } from './services/credential.service.ts';
+import { DatasetService } from './services/dataset.service.ts';
 import { EntityService, type NearbyPage } from './services/entity.service.ts';
 import { HealthService } from './services/health.service.ts';
 import { RoutingService, type PairRoute } from './services/routing.service.ts';
@@ -17,6 +19,7 @@ export interface Services {
   geofences: GeofenceService;
   credentials: CredentialService;
   routing: RoutingService;
+  datasets: DatasetService;
   health: HealthService;
 }
 
@@ -40,6 +43,9 @@ export function buildServices(pool: Pool, config: Config): Services {
       entityRepository,
       config.osrmUrl,
       new LRUCache<string, PairRoute>(config.routeCache),
+    ),
+    datasets: new DatasetService(
+      config.datasetsDir === null ? null : new DatasetStore(config.datasetsDir),
     ),
     health: new HealthService(new HealthRepository(pool), config.osrmUrl),
   };

@@ -185,6 +185,48 @@ export const KeyListResponse = Type.Array(
 
 export const SuccessResponse = Type.Object({ success: Type.Boolean() });
 
+// No pattern: a malformed segment names nothing, so it answers 404 like any unknown one.
+const DatasetName = Type.String({ description: 'Package name, e.g. "tr-admin".' });
+const DatasetVersion = Type.String({ description: 'A version from the listing, or "latest".' });
+
+export const DatasetParams = Type.Object({ name: DatasetName, version: DatasetVersion });
+
+export const DatasetFileParams = Type.Object({
+  name: DatasetName,
+  version: DatasetVersion,
+  file: Type.String({ description: 'A file name the manifest lists.' }),
+});
+
+export const DatasetListResponse = Type.Object({
+  datasets: Type.Array(
+    Type.Object({
+      name: Type.String(),
+      latest: Type.String(),
+      versions: Type.Array(Type.String(), { description: 'Retained versions, newest first.' }),
+    }),
+  ),
+});
+
+export const DatasetManifestResponse = Type.Object(
+  {
+    files: Type.Array(
+      Type.Object(
+        {
+          name: Type.String(),
+          sha256: Type.String(),
+          bytes: Type.Integer(),
+          features: Type.Optional(Type.Integer()),
+        },
+        { additionalProperties: true },
+      ),
+    ),
+  },
+  {
+    additionalProperties: true,
+    description: 'The manifest as published: version, sources, licence and every file.',
+  },
+);
+
 /** Attached to every guarded route, so the reference documents its failures. */
 export const guardedResponses = {
   400: ProblemResponse,

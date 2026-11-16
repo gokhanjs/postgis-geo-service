@@ -88,6 +88,7 @@ describe('validateRelease against the previous release', () => {
       failures: [],
       removed: [],
       added: [],
+      areaChanged: [],
     });
   });
 
@@ -145,5 +146,17 @@ describe('validateRelease against the previous release', () => {
 
     fatih.area_m2 = 50_000_000 * 0.94;
     expect(failuresOf(grown, release())).toContain('34-fatih');
+  });
+
+  it('publishes an area change only when told to, and still reports it', () => {
+    const grown = release();
+    const fatih = grown.districts.find((d) => d.code === '34-fatih');
+    if (fatih === undefined) throw new Error('fixture lacks 34-fatih');
+    fatih.area_m2 = 50_000_000 * 1.2;
+
+    expect(validateRelease(grown, release(), { acceptAreaChange: true })).toMatchObject({
+      ok: true,
+      areaChanged: ['34-fatih'],
+    });
   });
 });

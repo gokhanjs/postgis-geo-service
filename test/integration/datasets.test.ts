@@ -31,10 +31,12 @@ async function writeVersion(
   version: string,
   files: PackageFile[],
   strays: PackageFile[] = [],
+  missing: PackageFile[] = [],
 ): Promise<void> {
   const dir = join(root, name, version);
   await mkdir(dir, { recursive: true });
   for (const file of [...files, ...strays]) await writeFile(join(dir, file.name), file.body);
+  files = [...files, ...missing];
 
   const manifest = {
     name,
@@ -71,6 +73,7 @@ beforeAll(async () => {
       { name: 'NOTICE', body: NOTICE },
     ],
     [{ name: 'unlisted.txt', body: 'not part of the package' }],
+    [{ name: 'pruned.geojson', body: PROVINCES }],
   );
   // On disk but absent from the index: a version still being written, or one pruned.
   await writeVersion('tr-admin', '2026-12-07', [{ name: 'NOTICE', body: NOTICE }]);
@@ -83,6 +86,8 @@ beforeAll(async () => {
   await writeIndex('tr-places', '2026-11-02', ['2026-11-02']);
 
   await writeFile(join(root, 'secret.txt'), 'outside every package');
+  await mkdir(join(root, 'tr-broken'));
+  await writeFile(join(root, 'tr-broken', 'index.json'), '{"latest": "2026-11');
 
   server = await startTestServer({ DATASETS_DIR: root });
 });
@@ -176,12 +181,31 @@ describe('GET /api/v1/datasets/{name}/{version}/files/{file}', () => {
     expect(await res.text()).toBe(DISTRICTS);
   });
 
-  it('answers 304 when the client already holds the file', async () => {
+  it.each([
+    `"${sha256(DISTRICTS)}"`,
+    `W/"${sha256(DISTRICTS)}"`,
+    `"stale", "${sha256(DISTRICTS)}"`,
+    '*',
+  ])('answers 304 when the client already holds the file (%s)', async (tag) => {
     const res = await get('/tr-admin/2026-11-02/files/tr-34-districts.geojson', {
-      'if-none-match': `"${sha256(DISTRICTS)}"`,
+      'if-none-match': tag,
     });
 
     expect(res.status).toBe(304);
+    expect(res.headers.get('etag')).toBe(`"${sha256(DISTRICTS)}"`);
+  });
+
+  it('sends the file when the client holds another version', async () => {
+    const res = await get('/tr-admin/2026-11-02/files/tr-34-districts.geojson', {
+      'if-none-match': '"stale"',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(DISTRICTS);
+  });
+
+  it('answers 404 for a listed file that is no longer on disk', async () => {
+    await expectNotFound('/tr-admin/2026-11-02/files/pruned.geojson');
   });
 
   it('answers 404 for a file the manifest does not list, even when it is on disk', async () => {
@@ -198,6 +222,17 @@ describe('GET /api/v1/datasets/{name}/{version}/files/{file}', () => {
     '/tr-admin/2026-11-02/files/%2Fetc%2Fpasswd',
   ])('answers 404 for the path %s', async (path) => {
     await expectNotFound(path);
+  });
+});
+
+describe('a corrupt package', () => {
+  it('is left out of the listing and answers 404 rather than failing the others', async () => {
+    const res = await get('');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { datasets: Array<{ name: string }> };
+    expect(body.datasets.map((d) => d.name)).toEqual(['tr-admin', 'tr-places']);
+
+    await expectNotFound('/tr-broken/latest/manifest');
   });
 });
 

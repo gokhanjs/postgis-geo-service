@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin.ts';
 import entityRoutes from './routes/entities.ts';
 import healthRoutes from './routes/health.ts';
 import routingRoutes from './routes/routing.ts';
+import datasetRoutes from './routes/datasets.ts';
 import geofenceRoutes from './routes/geofences.ts';
 
 export interface BuildAppOptions {
@@ -50,6 +51,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(entityRoutes);
   await app.register(geofenceRoutes);
   await app.register(routingRoutes);
+  await app.register(datasetRoutes);
 
   return app;
 }
