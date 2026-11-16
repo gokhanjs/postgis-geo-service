@@ -2,7 +2,6 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fp from 'fastify-plugin';
-import type { FastifyRequest } from 'fastify';
 import { config } from '../config/index.ts';
 import { PROBLEM_CONTENT_TYPE, problems } from '../lib/problem.ts';
 
@@ -19,11 +18,8 @@ export default fp(
     await app.register(rateLimit, {
       max: config.rateLimit.ipMax,
       timeWindow: config.rateLimit.timeWindow,
-      // Quota belongs to the credential, not the address: many tenants behind
-      // one gateway would otherwise share a budget, and one tenant spread over
-      // many addresses would escape it entirely.
-      // By address: the unvalidated x-api-key header could simply be rotated.
-      keyGenerator: (request: FastifyRequest) => request.ip,
+      // The default key is the address with each IPv6 /64 folded into one;
+      // never the unvalidated x-api-key header, which could simply be rotated.
       errorResponseBuilder: (_request, context) => {
         const problem = problems.tooManyRequests();
         return {
