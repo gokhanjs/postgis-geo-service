@@ -10,6 +10,19 @@ export interface OsrmTableResponse {
 
 const REQUEST_TIMEOUT_MS = 5_000;
 
+// Swapping the routing container closes pooled keep-alive sockets, so a failed
+// connection is retried once; a timeout or an HTTP error is an answer.
+async function fetchWithReconnect(url: string): Promise<Response> {
+  const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const attempt = () => fetch(url, { signal });
+  try {
+    return await attempt();
+  } catch (err) {
+    if (!(err instanceof TypeError)) throw err;
+    return attempt();
+  }
+}
+
 /**
  * Asks OSRM for distances and durations from one origin to many destinations.
  *
@@ -28,7 +41,7 @@ export async function queryOsrmTable(
   const url = `${baseUrl}/table/v1/driving/${coords}?sources=0&annotations=distance,duration`;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    const res = await fetchWithReconnect(url);
     if (!res.ok) return null;
 
     const data = (await res.json()) as { code?: string } & OsrmTableResponse;
