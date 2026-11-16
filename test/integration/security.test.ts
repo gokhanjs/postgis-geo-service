@@ -91,6 +91,22 @@ describe('rate limiting', () => {
     const other = await fetch(url, { headers: { 'x-api-key': otherKey } });
     expect(other.status).toBe(200);
   });
+
+  it('meters an IPv6 /64 as one address, so rotating within it gains nothing', async () => {
+    const proxied = await startTestServer({ TRUST_PROXY_HOPS: '1', RATE_LIMIT_IP_MAX: '3' });
+    try {
+      const statuses: number[] = [];
+      for (let i = 1; i <= 5; i += 1) {
+        const res = await fetch(`${proxied.baseUrl}/health/live`, {
+          headers: { 'x-forwarded-for': `2001:db8:0:1::${i}` },
+        });
+        statuses.push(res.status);
+      }
+      expect(statuses.slice(3)).toEqual([429, 429]);
+    } finally {
+      await proxied.stop();
+    }
+  });
 });
 
 describe('geometry validation', () => {
