@@ -1,0 +1,127 @@
+name: Release
+
+permissions:
+  contents: read
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  # Production runs what is on main, so a tag pushed from any other branch stops here.
+  on-main:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+  ci:
+    needs: on-main
+    uses: ./.github/workflows/ci.yml
+
+  # Each architecture builds on a native runner rather than under QEMU emulation.
+  build:
+    needs: ci
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [api, db]
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - image: api
+            suffix: ''
+            context: .
+            file: docker/Dockerfile
+          - image: db
+            suffix: -db
+            context: docker/postgis
+            file: docker/postgis/Dockerfile
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platform }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # Pushed by digest only; the merge job names the multi-arch result.
+          outputs: type=image,name=ghcr.io/${{ github.repository }}${{ matrix.suffix }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+          echo "ARTIFACT=digest-${{ matrix.image }}-${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - image: api
+            suffix: ''
+          - image: db
+            suffix: -db
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-${{ matrix.image }}-*
+          merge-multiple: true
+          path: digests
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag the multi-arch image
+        working-directory: digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}${{ matrix.suffix }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # shellcheck disable=SC2046
+          docker buildx imagetools create -t "$IMAGE:$version" \
+            --annotation "index:org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:$version"
