@@ -23,6 +23,23 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
 
+# The reference data pipeline: the service plus osmium, which Alpine does not package.
+# Declared before runtime so that an untargeted build still yields the API image.
+FROM node:26-trixie-slim AS tools
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends osmium-tool dumb-init ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=production-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY scripts/datasets/process.sql ./dist/scripts/datasets/
+COPY migrations ./migrations
+COPY package.json ./
+USER node
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/scripts/datasets/update.js"]
+
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
