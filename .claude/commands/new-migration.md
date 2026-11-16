@@ -14,7 +14,11 @@ Write a migration for: $ARGUMENTS
    - A composite GiST index leads with the geography column.
    - `NOT NULL` with a default unless absence is meaningful.
    - New tables that hold tenant data need a row-level security policy and a
-     `GRANT` to `geo_app`, or the service cannot read them.
+     tenant view filtered on `current_tenant_id()` with
+     `WITH CASCADED CHECK OPTION`, never `security_barrier`. `geo_app` is
+     granted the view, not the table.
+   - Adding a column to a table behind a tenant view means recreating the view:
+     `SELECT *` fixed its column list when it was created.
    - `updated_at` is maintained by the `touch_updated_at` trigger, not by the
      write path.
 

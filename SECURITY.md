@@ -7,10 +7,14 @@ Report privately through this repository's GitHub security advisory form
 
 ## What this service guarantees
 
-- **Tenant isolation** of the two spatial tables is enforced by PostgreSQL
-  row-level security, not by application predicates. The service connects as a role that owns nothing and
-  has no `BYPASSRLS`, so a query missing a tenant predicate returns nothing
-  rather than another tenant's rows.
+- **Tenant isolation** of the two spatial tables is enforced by PostgreSQL,
+  not by application predicates. The service connects as a role that owns nothing and
+  can reach the tables only through views filtered on the request's tenant, so
+  a query missing a tenant predicate returns nothing rather than another
+  tenant's rows. The views are not security barriers, so an error raised by a
+  query's own predicate could quote another tenant's value; repository SQL
+  applies nothing that can raise to these columns. Row-level security policies
+  on the tables cover any role later granted them directly.
 - **Credentials are stored as digests.** API keys and admin tokens cannot be
   recovered from a database dump. Listing shows only a prefix.
 - **Errors do not describe the schema.** Unrecognised failures are logged in
@@ -20,6 +24,6 @@ Report privately through this repository's GitHub security advisory form
 
 - The service is not exposed directly. `TRUST_PROXY_HOPS` is only safe if the
   proxy **overwrites** `X-Forwarded-For`; see `deploy/nginx/`.
-- The runtime database role is not a superuser. A superuser bypasses every
-  row-level security policy, which would silently disable tenant isolation.
+- The runtime database role is not a superuser. A superuser can read the
+  tables directly, past both the tenant views and the policies behind them.
 - TLS terminates at the proxy. The service speaks plain HTTP.
