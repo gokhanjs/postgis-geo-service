@@ -1,0 +1,10 @@
+[Unit]
+Description=Rebuild the postgis-geo-service reference datasets monthly
+
+[Timer]
+# The first Monday of the month, a day after the weekly routing refresh downloads the extract.
+OnCalendar=Mon *-*-01..07 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
