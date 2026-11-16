@@ -64,5 +64,21 @@ export const problems = {
   routingUnreachable: () =>
     new HttpProblem(503, 'routing-unreachable', 'Routing service unreachable'),
 
+  routeNotFound: () =>
+    new HttpProblem(
+      422,
+      'route-not-found',
+      'No road route between the points',
+      'Both points were matched to roads, but no road connects them.',
+    ),
+
+  pointNotRoutable: () =>
+    new HttpProblem(
+      422,
+      'point-not-routable',
+      'No road near a point',
+      'The origin or the destination has no drivable road within 1 km.',
+    ),
+
   tooManyRequests: () => new HttpProblem(429, 'rate-limit-exceeded', 'Too many requests'),
 } as const;

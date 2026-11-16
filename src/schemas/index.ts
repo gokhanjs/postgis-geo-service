@@ -102,6 +102,13 @@ export const RoutingBody = Type.Object(
   { additionalProperties: false },
 );
 
+const RoutePoint = Type.Object({ lat: Latitude, lng: Longitude }, { additionalProperties: false });
+
+export const PairRouteBody = Type.Object(
+  { origin: RoutePoint, destination: RoutePoint },
+  { additionalProperties: false },
+);
+
 export const AdminKeyBody = Type.Object(
   {
     tenant_id: Type.Integer({ minimum: 1, maximum: 2_147_483_647 }),
@@ -151,6 +158,14 @@ export const RoutingResponse = Type.Array(
     duration_min: Type.Union([Type.Number(), Type.Null()]),
   }),
 );
+
+export const PairRouteResponse = Type.Object({
+  road_distance_km: Type.Number(),
+  duration_min: Type.Number(),
+  data_version: Type.Union([Type.String(), Type.Null()], {
+    description: 'Map data the answer was computed on; null when OSRM was built without one.',
+  }),
+});
 
 export const IssuedKeyResponse = Type.Object({
   key: Type.String({ description: 'Shown once. Only its digest is stored.' }),

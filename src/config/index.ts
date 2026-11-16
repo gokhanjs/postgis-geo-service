@@ -82,6 +82,12 @@ export const config = {
     max: 500,
     ttl: 5 * 60 * 1000,
   },
+
+  /** No tenant write changes a road distance, so only a map update or the TTL retires one. */
+  routeCache: {
+    max: 10_000,
+    ttl: 24 * 60 * 60 * 1000,
+  },
 } as const;
 
 export type Config = typeof config;

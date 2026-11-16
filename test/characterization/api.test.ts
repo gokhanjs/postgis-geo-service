@@ -15,7 +15,7 @@ let keyA: string;
 let keyB: string;
 
 beforeAll(async () => {
-  server = await startTestServer();
+  server = await startTestServer({ OSRM_URL: '' });
 });
 
 afterAll(async () => {

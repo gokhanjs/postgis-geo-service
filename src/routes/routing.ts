@@ -3,6 +3,8 @@ import { problems } from '../lib/problem.ts';
 import {
   apiKeySecurity,
   guardedResponses,
+  PairRouteBody,
+  PairRouteResponse,
   ProblemResponse,
   RoutingBody,
   RoutingResponse,
@@ -37,6 +39,44 @@ const routingRoutes: FastifyPluginAsyncTypebox = async (app) => {
           throw problems.routingUnreachable();
         case 'ok':
           return result.destinations;
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/routing/route',
+    {
+      preHandler: [app.authenticateApiKey],
+      schema: {
+        tags: ['routing'],
+        summary: 'Road distance and duration between two points',
+        security: apiKeySecurity,
+        body: PairRouteBody,
+        response: {
+          200: PairRouteResponse,
+          422: ProblemResponse,
+          503: ProblemResponse,
+          ...guardedResponses,
+        },
+      },
+    },
+    async (request) => {
+      const result = await app.services.routing.route(
+        request.body.origin,
+        request.body.destination,
+      );
+
+      switch (result.status) {
+        case 'disabled':
+          throw problems.routingDisabled();
+        case 'unreachable':
+          throw problems.routingUnreachable();
+        case 'no_route':
+          throw problems.routeNotFound();
+        case 'no_road_near_point':
+          throw problems.pointNotRoutable();
+        case 'ok':
+          return result.route;
       }
     },
   );

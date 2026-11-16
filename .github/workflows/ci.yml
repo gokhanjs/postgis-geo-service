@@ -79,3 +79,54 @@ jobs:
 
       - name: Build the production image
         run: docker build -f docker/Dockerfile -t postgis-geo-service:ci .
+
+  # The verify job runs the routing contract against a stub; this one runs it
+  # against a real engine built by the same compose profile developers use.
+  routing:
+    runs-on: ubuntu-24.04
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: geo_service_test
+      TEST_DB_NAME: geo_service_test
+      DB_USER: geo_app
+      DB_PASS: geo_app
+      MIGRATION_DB_USER: postgres
+      MIGRATION_DB_PASS: postgres
+      OSRM_URL: http://127.0.0.1:5000
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: docker compose up -d --wait db
+
+      - run: docker compose --profile routing up -d osrm
+
+      - name: Wait for OSRM
+        run: |
+          for _ in $(seq 60); do
+            curl -fsS "$OSRM_URL/route/v1/driving/7.4284,43.7393;7.4156,43.7276?overview=false" >/dev/null && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Routing suite against OSRM
+        run: |
+          pnpm vitest run test/integration/routing.test.ts \
+            --reporter=default --reporter=json --outputFile.json=routing-results.json
+          # The real-engine tests skip without OSRM_URL, which would still pass.
+          jq -e '.numPendingTests == 0' routing-results.json
+
+      - name: OSRM logs
+        if: failure()
+        run: docker compose --profile routing logs osrm-init osrm
