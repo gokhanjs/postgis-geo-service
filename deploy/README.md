@@ -25,18 +25,20 @@ client ─443─> reverse proxy ─> 127.0.0.1:API_PORT ─> api
 
 ## Files
 
-| Path                                         | Purpose                                               |
-| -------------------------------------------- | ----------------------------------------------------- |
-| `compose.yml`                                | `db`, the one-shot `migrate`, `api`                   |
-| `.env.example`                               | Every variable; copy to `.env`                        |
-| `bin/deploy.sh`                              | Starts a version, returns to the previous one on fail |
-| `bin/watch.sh`                               | One health pass, reported to a ping URL               |
-| `bin/backup.sh`                              | Nightly `pg_dump`, pruned after `BACKUP_KEEP_DAYS`    |
-| `bin/admin-token.sh`                         | Issues the admin token, revoking the previous one     |
-| `bin/update-osrm.sh`                         | Builds routing data and swaps it in without downtime  |
-| `systemd/geo-{watch,backup}.{service,timer}` | Every minute, and nightly at 03:30                    |
-| `systemd/geo-osrm-update.{service,timer}`    | Sundays at 03:00                                      |
-| `nginx/geo-service.conf`                     | Reverse proxy with TLS and edge rate limiting         |
+| Path                                          | Purpose                                               |
+| --------------------------------------------- | ----------------------------------------------------- |
+| `compose.yml`                                 | `db`, the one-shot `migrate`, `api`                   |
+| `.env.example`                                | Every variable; copy to `.env`                        |
+| `bin/deploy.sh`                               | Starts a version, returns to the previous one on fail |
+| `bin/watch.sh`                                | One health pass, reported to a ping URL               |
+| `bin/backup.sh`                               | Nightly `pg_dump`, pruned after `BACKUP_KEEP_DAYS`    |
+| `bin/admin-token.sh`                          | Issues the admin token, revoking the previous one     |
+| `bin/update-osrm.sh`                          | Builds routing data and swaps it in without downtime  |
+| `bin/update-datasets.sh`                      | Builds the reference datasets, published past a gate  |
+| `systemd/geo-{watch,backup}.{service,timer}`  | Every minute, and nightly at 03:30                    |
+| `systemd/geo-osrm-update.{service,timer}`     | Sundays at 03:00                                      |
+| `systemd/geo-datasets-update.{service,timer}` | First Monday of the month at 04:00                    |
+| `nginx/geo-service.conf`                      | Reverse proxy with TLS and edge rate limiting         |
 
 The scripts and units expect the install directory to be
 `/opt/postgis-geo-service`. Running elsewhere means editing `ExecStart` in the
@@ -163,6 +165,50 @@ and the host also needs room for the preprocessing peak, so budget about 22 GiB.
 For another extract, run once with a generous cap, read the peak from the log
 or the success ping, and set the caps from it.
 
+## Reference datasets
+
+`bin/update-datasets.sh` builds the `tr-admin` and `tr-places` packages that
+`/api/v1/datasets` serves (see [docs/datasets.md](../docs/datasets.md)). It
+reuses the extract `update-osrm.sh` last downloaded rather than fetching one,
+downloads the airport list itself, and runs the `<version>-tools` image of the
+deployed version on `geo_internal`, which has no route out. The pipeline writes
+`data/datasets/`, which `api` mounts read-only:
+
+1. it loads the extract and the airport list into the `reference` schema, which
+   only the migration role can read, and builds the boundaries there;
+2. the gate compares the result with the release serving now, and writes its
+   report to `data/datasets/.reports/<version>.json` whether or not it passes;
+3. only a passing release is exported and moved into place, by rename, with the
+   three newest versions kept;
+4. the working tables are emptied, so they stay out of the nightly dump.
+
+A blocked release leaves the previous one serving and posts the gate's reasons to
+`HC_DATASETS_URL/fail`. When the report shows a change that is real, for example
+two districts merged or a boundary corrected, publish it deliberately:
+
+```bash
+bin/update-datasets.sh --accept-removed        # codes that are gone
+bin/update-datasets.sh --accept-area-change    # a district area moved by more than 5%
+```
+
+İstanbul's district codes are pinned in the image, so a change there takes a
+code change and a release, not a flag.
+
+The script runs the `<version>-tools` image of the deployed version, which
+exists from the release that added it, so deploy that release first. It builds
+from the extract `OSRM_REGION_URL` names, so the first run follows the first
+routing build:
+
+```bash
+bin/update-datasets.sh
+systemctl enable --now geo-datasets-update.timer
+```
+
+On a 650 MB extract the pipeline takes about a minute and peaks at 2.2 GiB, most
+of it osmium filtering the extract; the packages take 11 MB. The peak is the
+cgroup's own record: one-second `docker stats` samples miss it, and a 2 GiB cap
+kills the run. `DATASETS_MEMORY=4g` leaves room for a growing extract.
+
 ## Monitoring
 
 `watch.sh` skips its pass while a deploy holds the lock, then checks readiness, that `db` and `api` run and are healthy
@@ -176,6 +222,9 @@ period and a one-minute grace, and an outage reaches you within two minutes.
 `backup.sh` pings `HC_BACKUP_URL` at `/start`, on success, and at `/fail`.
 `update-osrm.sh` does the same with `HC_OSRM_URL`, reporting the build's
 preprocessing time and peak memory on success; give that check a one-week period.
+`update-datasets.sh` reports to `HC_DATASETS_URL` with the published counts, or
+the gate's failures. First Mondays can be five weeks apart, so give that check a
+five-week period and a grace of a day.
 
 ## Restoring
 
