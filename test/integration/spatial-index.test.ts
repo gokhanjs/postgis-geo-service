@@ -27,11 +27,11 @@ beforeEach(async () => {
   await admin.query('TRUNCATE entity_locations, geofences');
   await admin.query(
     `INSERT INTO entity_locations (entity_id, entity_type, tenant_id, location)
-     VALUES ('a1', 'restaurant', 1, ST_Point(29.0, 41.0, 4326)::geography)`,
+     VALUES ('a1', 'site', 1, ST_Point(29.0, 41.0, 4326)::geography)`,
   );
   await admin.query(
     `INSERT INTO geofences (external_id, entity_id, entity_type, tenant_id, area)
-     VALUES (1, 'a1', 'restaurant', 1,
+     VALUES (1, 'a1', 'site', 1,
              ST_MakeEnvelope(28.9, 40.9, 29.1, 41.1, 4326)::geography)`,
   );
 });
@@ -70,7 +70,7 @@ describe('spatial index under tenant isolation', () => {
       `SELECT entity_id FROM ${ENTITIES}
        WHERE is_active AND entity_type = $1 AND tenant_id = $2
          AND ST_DWithin(location, $3::geography, $4)`,
-      ['restaurant', 1, 'SRID=4326;POINT(29 41)', 1000],
+      ['site', 1, 'SRID=4326;POINT(29 41)', 1000],
     );
     expect(conditions).toContainEqual(expect.stringContaining('location &&'));
   });
@@ -80,7 +80,7 @@ describe('spatial index under tenant isolation', () => {
       `SELECT entity_id FROM ${GEOFENCES}
        WHERE is_active AND entity_type = $1 AND tenant_id = $2
          AND ST_Covers(area, $3::geography)`,
-      ['restaurant', 1, 'SRID=4326;POINT(29 41)'],
+      ['site', 1, 'SRID=4326;POINT(29 41)'],
     );
     expect(conditions).toContainEqual(expect.stringContaining('area &&'));
   });

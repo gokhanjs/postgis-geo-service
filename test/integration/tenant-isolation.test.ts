@@ -25,8 +25,8 @@ beforeEach(async () => {
   await admin.query('TRUNCATE entity_locations, geofences');
   await admin.query(
     `INSERT INTO entity_locations (entity_id, entity_type, tenant_id, location)
-     VALUES ('a1', 'restaurant', 1, ST_Point(29.0, 41.0, 4326)::geography),
-            ('b1', 'restaurant', 2, ST_Point(32.0, 39.0, 4326)::geography)`,
+     VALUES ('a1', 'site', 1, ST_Point(29.0, 41.0, 4326)::geography),
+            ('b1', 'site', 2, ST_Point(32.0, 39.0, 4326)::geography)`,
   );
 });
 
@@ -94,7 +94,7 @@ describe('tenant views', () => {
       asTenant(
         1,
         `INSERT INTO tenant_entity_locations (entity_id, entity_type, tenant_id, location)
-         VALUES ('smuggled', 'restaurant', 2, ST_Point(1, 1, 4326)::geography)`,
+         VALUES ('smuggled', 'site', 2, ST_Point(1, 1, 4326)::geography)`,
       ),
     ).rejects.toThrow(/check option/i);
   });
@@ -140,7 +140,7 @@ describe('isolation through the running service', () => {
     keyA = await createApiKey(server.pool, 1, 'tenant-a');
     keyB = await createApiKey(server.pool, 2, 'tenant-b');
 
-    await fetch(`${server.baseUrl}/api/v1/entities/restaurant/only-a`, {
+    await fetch(`${server.baseUrl}/api/v1/entities/site/only-a`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-api-key': keyA },
       body: JSON.stringify({ lat: 41.0, lng: 29.0, is_active: true }),
@@ -150,7 +150,7 @@ describe('isolation through the running service', () => {
       headers: { 'content-type': 'application/json', 'x-api-key': keyA },
       body: JSON.stringify({
         entity_id: 'only-a',
-        entity_type: 'restaurant',
+        entity_type: 'site',
         area: squarePolygon(29.0, 41.0),
         is_active: true,
       }),
@@ -161,20 +161,19 @@ describe('isolation through the running service', () => {
     fetch(`${server.baseUrl}${path}`, { headers: { 'x-api-key': key } }).then((r) => r.json());
 
   it('hides another tenant entity from proximity search', async () => {
-    const url = '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant';
+    const url = '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=site';
     expect(await read(url, keyA)).toMatchObject({ results: [{ entity_id: 'only-a' }] });
     expect(await read(url, keyB)).toEqual({ results: [], next_cursor: null });
   });
 
   it('hides another tenant geofence from containment search', async () => {
-    const url = '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant';
+    const url = '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=site';
     expect(await read(url, keyA)).toEqual({ results: [{ entity_id: 'only-a' }] });
     expect(await read(url, keyB)).toEqual({ results: [] });
   });
 
   it('hides another tenant geofence from the single-entity check', async () => {
-    const url =
-      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant&entity_id=only-a';
+    const url = '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=site&entity_id=only-a';
     expect(await read(url, keyA)).toEqual({ inside: true });
     expect(await read(url, keyB)).toEqual({ inside: false });
   });
@@ -182,7 +181,7 @@ describe('isolation through the running service', () => {
   it('hides another tenant entity from routing lookups', async () => {
     const body = {
       origin: { lat: 41.0, lng: 29.0 },
-      destinations: [{ entity_id: 'only-a', entity_type: 'restaurant' }],
+      destinations: [{ entity_id: 'only-a', entity_type: 'site' }],
     };
     // Both answer 503; the point is neither reaches the other's coordinates.
     for (const key of [keyA, keyB]) {
