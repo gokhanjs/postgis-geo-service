@@ -13,9 +13,18 @@ services hold business logic and know neither HTTP nor SQL. ESLint rejects a
 `pg` import from `src/routes` or `src/services`.
 
 **Every repository method takes a tenant id and runs inside `withTenant`.**
-Row-level security is the backstop, not the primary guard: write the tenant
-predicate _and_ rely on the policy. A method that skips `withTenant` will read
-zero rows, because the policy has no tenant to match.
+The tenant view is the backstop, not the primary guard: write the tenant
+predicate _and_ rely on the view. A method that skips `withTenant` will read
+zero rows, because the view has no tenant to match.
+
+**The service reaches spatial tables only through their tenant views.**
+Repositories name `tenant_entity_locations` and `tenant_geofences`; the runtime
+role cannot read the tables. Never set `security_barrier` on these views: like
+row-level security, it keeps every PostGIS predicate out of the index, because
+none is `LEAKPROOF`. Leave `security_invoker` off and the tables without
+`FORCE ROW LEVEL SECURITY`. Apply no cast or raising function to a view column
+in a predicate: the view is no barrier, so the error could quote another
+tenant's row. ADR 0006 has the measurement.
 
 **Never cast the indexed column.** [enforced] Columns are `geography`; casting a
 parameter (`$1::geography`) is fine and necessary, but casting the column

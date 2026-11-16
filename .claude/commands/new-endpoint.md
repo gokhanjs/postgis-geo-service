@@ -14,8 +14,9 @@ Produce, in this order:
 1. **Schema** in `src/schemas/index.ts`: TypeBox, `additionalProperties: false`,
    a `description` on each field. This is also the OpenAPI documentation.
 2. **Repository** method: the only place SQL may appear. It takes a tenant id
-   and runs inside `withTenant`. Write the tenant predicate explicitly even
-   though row-level security would also catch its absence.
+   and runs inside `withTenant`. Name the tenant view, never the table, and
+   write the tenant predicate explicitly even though the view would also catch
+   its absence.
 3. **Service** method: business logic and cache handling. It must not import
    `pg` or reference HTTP.
 4. **Route**: request to service call, a `tags` and `summary` in the schema,

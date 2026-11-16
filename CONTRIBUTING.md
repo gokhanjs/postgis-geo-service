@@ -28,7 +28,8 @@ CI runs exactly this against a PostGIS service container.
 - **Geometry columns are `geography`.** Do not cast per query; the cast is what
   stops the GiST index from being usable.
 - **Every repository method takes a tenant id** and runs inside `withTenant`.
-  Row-level security is the backstop, not the primary guard.
+  Its tenant view is the backstop, not the primary guard, and repositories
+  name the view, never the table.
 - **A new endpoint means a TypeBox schema and an integration test.** The schema
   is also the OpenAPI documentation, so an undocumented endpoint is one that
   skipped validation.

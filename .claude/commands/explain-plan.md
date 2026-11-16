@@ -16,8 +16,8 @@ built for.
    tenants and types. A few rows will produce a sequential scan regardless and
    tell you nothing.
 
-3. Run it as `geo_app` with `app.tenant_id` set, so row-level security is
-   active exactly as in production:
+3. Run it as `geo_app` with `app.tenant_id` set, through the tenant view, so
+   the plan is the one the service gets in production:
 
    ```sql
    EXPLAIN (ANALYZE, BUFFERS) <query>;

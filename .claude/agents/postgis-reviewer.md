@@ -11,19 +11,22 @@ not report style opinions.
 Check every query and migration for:
 
 **Tenant scoping.** Does the method take a tenant id, run inside `withTenant`,
-and carry the predicate explicitly? An upsert is the dangerous case: is the
-conflict target tenant-scoped, or could one tenant's identifier collide with
-another's? That exact defect transferred ownership of a row between tenants.
+carry the predicate explicitly, and name the tenant view rather than the
+table? An upsert is the dangerous case: is the conflict target tenant-scoped,
+or could one tenant's identifier collide with another's? That exact defect
+transferred ownership of a row between tenants.
 
 **Index usability.** Does any predicate cast the indexed column
 (`location::geography`)? Does a composite GiST index lead with a scalar column
-rather than the geography one? Both stop the spatial predicate from reaching
-the index while leaving it looking correct.
+rather than the geography one? Does a migration set `security_barrier` on a
+tenant view? All three stop the spatial predicate from reaching the index while
+leaving it looking correct.
 
 Verify with `EXPLAIN`, do not infer. A live database is available:
 `docker compose exec -T db psql -U postgres -d geo_service_test`. Load enough
-rows that the planner has a real choice. Report whether the spatial condition
-lands in `Index Cond` or in `Filter`.
+rows that the planner has a real choice, and plan as `geo_app` with
+`app.tenant_id` set: as `postgres` the plan is not the one the service gets.
+Report whether the spatial condition lands in `Index Cond` or in `Filter`.
 
 **Spatial predicates.** `ST_Contains` where `ST_Covers` is meant, which drops
 points on a shared boundary. A filter and an output that use different earth

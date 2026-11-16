@@ -48,7 +48,7 @@ after a schema change. Doing it once, correctly, behind an HTTP boundary means
 the application team asks a question instead of writing PostGIS.
 
 Multi-tenancy is the other half. Isolation here is a **database guarantee**,
-not a convention: PostgreSQL row-level security decides what a request can see,
+not a convention: PostgreSQL decides what a request can see,
 so a query that forgets its tenant predicate returns nothing rather than
 someone else's rows. See [Tenant isolation](#tenant-isolation).
 
@@ -220,7 +220,7 @@ Request
   ├─ route            HTTP mapped to a service call. No logic, no SQL
   ├─ service          business logic and caching. Knows neither HTTP nor SQL
   ├─ repository       all SQL, and nothing else. Sets the tenant on the session
-  └─ PostgreSQL       row-level security enforces the tenant boundary
+  └─ PostgreSQL       tenant views enforce the tenant boundary
        ↑
        └─ the guarantee holds even if the query above forgets its predicate
 ```
@@ -246,29 +246,36 @@ src/
 ## Tenant isolation
 
 The service connects to PostgreSQL as a **restricted role**, not the owner.
-Each request sets `app.tenant_id` transaction-locally, and row-level security
-policies filter every read and write of the two spatial tables against it. The
-credential tables sit outside those policies by necessity: resolving which
-tenant is calling happens before there is a tenant to filter on.
+Each request sets `app.tenant_id` transaction-locally, and the service reaches
+the two spatial tables only through views that filter every read and write
+against it. The credential tables sit outside that filter by necessity:
+resolving which tenant is calling happens before there is one to filter on.
 
 This matters because the alternative is a convention. In a codebase where
 isolation depends on every query carrying `WHERE tenant_id = $1`, isolation
 lasts exactly until someone forgets. Here, forgetting yields an empty result,
 not a leak.
 
-Two details make it real rather than decorative:
+Three details make it real rather than decorative:
 
-- **A superuser bypasses every policy.** Migrations run as the owner because
-  they create extensions, roles and policies; the service runs as `geo_app`,
-  which owns nothing. Running the API as `postgres` would silently disable
-  every policy in this section.
+- **The service role can name only the views.** Migrations run as the owner
+  because they create extensions, roles and views; the service runs as
+  `geo_app`, which owns nothing and has no privilege on the tables. Running the
+  API as `postgres` would put the unfiltered tables within reach of any query.
 - **The setting is transaction-local.** A pooled connection outlives the
   request that used it, so a session-level `SET` would hand one tenant's
   identity to the next request that reused the connection.
+- **The views are not security barriers.** Row-level security alone kept the
+  spatial predicate out of the GiST index, because PostGIS functions are not
+  `LEAKPROOF`, and a 1 km search read every row the tenant had. The policies
+  stay on the tables for any role later granted them directly;
+  [ADR 0006](docs/adr/0006-tenant-views-over-row-level-security.md) has the
+  measurement and what the views give up.
 
-Ten tests assert this: six against the policies directly, issuing queries with
-no tenant predicate at all, and four driving the running service over HTTP as
-one tenant to confirm another tenant's data is unreachable.
+Eleven tests assert this: seven against the database directly, issuing queries
+with no tenant predicate at all, and four driving the running service over HTTP
+as one tenant to confirm another tenant's data is unreachable. Two more plan the
+spatial queries as `geo_app` and fail if the predicate leaves the index.
 
 ---
 
