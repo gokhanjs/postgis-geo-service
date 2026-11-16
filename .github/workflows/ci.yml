@@ -80,6 +80,11 @@ jobs:
       - name: Build the production image
         run: docker build -f docker/Dockerfile -t postgis-geo-service:ci .
 
+      - name: Build the data pipeline image
+        run: |
+          docker build -f docker/Dockerfile --target tools -t postgis-geo-service:ci-tools .
+          docker run --rm postgis-geo-service:ci-tools osmium --version
+
   # The verify job runs the routing contract against a stub; this one runs it
   # against a real engine built by the same compose profile developers use.
   routing:

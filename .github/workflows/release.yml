@@ -27,17 +27,25 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        image: [api, db]
+        image: [api, tools, db]
         platform: [linux/amd64, linux/arm64]
         include:
           - image: api
             suffix: ''
             context: .
             file: docker/Dockerfile
+            target: runtime
+          # The data pipeline: same repository as the API, told apart by its tag.
+          - image: tools
+            suffix: ''
+            context: .
+            file: docker/Dockerfile
+            target: tools
           - image: db
             suffix: -db
             context: docker/postgis
             file: docker/postgis/Dockerfile
+            target: ''
           - platform: linux/amd64
             runner: ubuntu-24.04
           - platform: linux/arm64
@@ -63,6 +71,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
           platforms: ${{ matrix.platform }}
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           # Pushed by digest only; the merge job names the multi-arch result.
@@ -92,8 +101,13 @@ jobs:
         include:
           - image: api
             suffix: ''
+            tag: ''
+          - image: tools
+            suffix: ''
+            tag: -tools
           - image: db
             suffix: -db
+            tag: ''
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -118,8 +132,9 @@ jobs:
         working-directory: digests
         env:
           IMAGE: ghcr.io/${{ github.repository }}${{ matrix.suffix }}
+          TAG: ${{ matrix.tag }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME#v}$TAG"
           # shellcheck disable=SC2046
           docker buildx imagetools create -t "$IMAGE:$version" \
             --annotation "index:org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
