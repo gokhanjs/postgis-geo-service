@@ -1,2 +1,7 @@
 onlyBuiltDependencies:
   - esbuild
+
+# typescript-eslint still ranges minimatch ^10, and every 10.x is inside
+# GHSA-g3hv-75wg-m249; 11 keeps the same API. Drop once upstream moves.
+overrides:
+  '@typescript-eslint/typescript-estree>minimatch': ^11.0.8

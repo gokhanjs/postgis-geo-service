@@ -4,9 +4,9 @@
   "description": "Multi-tenant geospatial microservice for proximity search, geofencing and road routing",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@12.21.0",
   "scripts": {
     "dev": "node --watch src/server.ts",
     "start": "node dist/src/server.js",
@@ -25,30 +25,30 @@
     "osrm:update": "node scripts/osrm-update.ts"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.0",
-    "@fastify/helmet": "^13.0.2",
-    "@fastify/rate-limit": "^10.3.0",
-    "@fastify/swagger": "^9.8.1",
-    "@fastify/swagger-ui": "^6.1.1",
-    "@fastify/type-provider-typebox": "^6.1.0",
+    "@fastify/cors": "^11.4.3",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/swagger": "^9.9.4",
+    "@fastify/swagger-ui": "^6.1.4",
+    "@fastify/type-provider-typebox": "^6.3.0",
     "@sinclair/typebox": "^0.34.52",
-    "dotenv": "^17.4.2",
-    "fastify": "^5.8.5",
-    "fastify-plugin": "^6.0.0",
-    "lru-cache": "^11.3.5",
-    "pg": "^8.20.0"
+    "dotenv": "^18.0.10",
+    "fastify": "^5.12.8",
+    "fastify-plugin": "^6.0.1",
+    "lru-cache": "^11.5.3",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.20.1",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
-    "eslint": "^10.9.1",
-    "globals": "^17.11.0",
-    "prettier": "^3.9.6",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.68.0",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   },
   "type": "module"
 }

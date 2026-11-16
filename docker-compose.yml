@@ -2,7 +2,7 @@ name: postgis-geo-service
 
 services:
   db:
-    image: postgis/postgis:16-3.4
+    build: docker/postgis
     restart: unless-stopped
     environment:
       # The container superuser is the migration role, not the service role.
@@ -13,9 +13,15 @@ services:
       # Loopback only: never publish a database with a default password.
       - '127.0.0.1:${DB_PORT:-5432}:5432'
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PostgreSQL 18 images keep PGDATA in a versioned directory under this path.
+      - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${MIGRATION_DB_USER:-postgres} -d ${DB_NAME:-geo_service}']
+      # Over TCP: the entrypoint's temporary init server answers on the socket only.
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -h 127.0.0.1 -U ${MIGRATION_DB_USER:-postgres} -d ${DB_NAME:-geo_service}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -59,13 +65,13 @@ services:
       DB_PASS: ${DB_PASS:-geo_app}
       PORT: 3000
     ports:
-      - '${PORT:-3000}:3000'
+      - '127.0.0.1:${PORT:-3000}:3000'
 
   # Downloads and preprocesses an OSM extract. Runs once, then exits.
   # Reprocessing only happens when the .osrm files are missing from the volume.
   osrm-init:
     profiles: ['routing']
-    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    image: ghcr.io/project-osrm/osrm-backend:v26.11.0-debian
     volumes:
       - osrm-data:/data
     environment:
@@ -82,7 +88,7 @@ services:
         fi
         echo "[osrm-init] downloading $${OSRM_REGION_URL}"
         # The image ships neither curl nor wget.
-        apt-get update -qq && apt-get install -y -qq --no-install-recommends curl
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates curl
         curl -fsSL -o "$${OSRM_REGION_NAME}.osm.pbf" "$${OSRM_REGION_URL}"
         osrm-extract -p /opt/car.lua "$${OSRM_REGION_NAME}.osm.pbf"
         osrm-partition "$${OSRM_REGION_NAME}.osrm"
@@ -91,7 +97,7 @@ services:
 
   osrm:
     profiles: ['routing']
-    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    image: ghcr.io/project-osrm/osrm-backend:v26.11.0-debian
     restart: unless-stopped
     depends_on:
       osrm-init:
