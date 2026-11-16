@@ -18,8 +18,11 @@ ready || problems+=('api: /health/ready is not ok')
 for service in db api; do
   [ -n "$(container_of "$service")" ] || problems+=("$service: not running")
 done
+if [ -n "$(env_value OSRM_URL)" ] && [ -z "$(recorded_osrm -q)" ]; then
+  problems+=('osrm: not running')
+fi
 
-ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT")" ||
+ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" && recorded_osrm -q)" ||
   problems+=('docker: cannot list containers')
 stats=""
 # shellcheck disable=SC2086

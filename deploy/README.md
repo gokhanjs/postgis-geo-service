@@ -12,7 +12,7 @@ client ─443─> reverse proxy ─> 127.0.0.1:API_PORT ─> api
                                  geo_internal (internal: no route out)
                                  ├── api
                                  ├── db       (no published port)
-                                 └── routing  (started outside compose, joins by name)
+                                 └── osrm-<build> (alias "osrm", run by bin/update-osrm.sh)
 ```
 
 - Only `api` publishes a port, and only on loopback. Docker publishes ports
@@ -33,12 +33,14 @@ client ─443─> reverse proxy ─> 127.0.0.1:API_PORT ─> api
 | `bin/watch.sh`                               | One health pass, reported to a ping URL               |
 | `bin/backup.sh`                              | Nightly `pg_dump`, pruned after `BACKUP_KEEP_DAYS`    |
 | `bin/admin-token.sh`                         | Issues the admin token, revoking the previous one     |
+| `bin/update-osrm.sh`                         | Builds routing data and swaps it in without downtime  |
 | `systemd/geo-{watch,backup}.{service,timer}` | Every minute, and nightly at 03:30                    |
+| `systemd/geo-osrm-update.{service,timer}`    | Sundays at 03:00                                      |
 | `nginx/geo-service.conf`                     | Reverse proxy with TLS and edge rate limiting         |
 
 The scripts and units expect the install directory to be
 `/opt/postgis-geo-service`. Running elsewhere means editing `ExecStart` in the
-two `.service` files.
+`.service` files.
 
 ## First install
 
@@ -75,6 +77,8 @@ cp systemd/geo-*.{service,timer} /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now geo-watch.timer geo-backup.timer
 ```
+
+Routing is optional; see [Routing](#routing) to turn it on.
 
 Point the reverse proxy at `127.0.0.1:API_PORT` and set `TRUST_PROXY_HOPS=1`
 only if it overwrites `X-Forwarded-For`; [`nginx/`](nginx/) shows how.
@@ -116,9 +120,53 @@ This swaps the service images only. A migration the newer version applied stays 
 every migration has an `.undo` file, but when data depends on the new schema,
 restore the dump taken just before the deploy instead.
 
+## Routing
+
+OSRM runs outside compose, one container per build, so a new build can start
+beside the one serving. `bin/update-osrm.sh`:
+
+1. downloads `OSRM_REGION_URL` into `data/osm/` and checks the `.md5` published
+   beside it;
+2. preprocesses it into `data/osrm/<build>/`, each step in a container with no
+   network, capped at `OSRM_PREPARE_MEMORY`, logging its peak memory;
+3. starts `osrm-<build>` on `geo_internal` without the `osrm` alias and asks it,
+   from inside `api`, to route `OSRM_SMOKE_ROUTE`: the route must exist, fall
+   within `OSRM_SMOKE_KM` and carry the new build's `data_version`;
+4. only then moves the alias to it and stops the previous container. The API
+   retries a dropped connection once, so requests in flight are still answered.
+
+A failure before step 4 removes the new build and leaves the old one serving;
+the script exits non-zero and posts the reason to `HC_OSRM_URL/fail`. The three
+newest builds stay on disk, and the serving and previous ones always do.
+
+The check runs from `api`, so deploy first. Then build, point the API at the
+alias, and schedule the weekly refresh:
+
+```bash
+bin/update-osrm.sh
+# set OSRM_URL=http://osrm:5000 in .env
+bin/deploy.sh "$(cat .deployed-version)"
+systemctl enable --now geo-osrm-update.timer
+```
+
+To serve the previous build again (run twice, it toggles back):
+
+```bash
+bin/update-osrm.sh --rollback
+```
+
+The defaults fit a 650 MB extract, measured on arm64: preprocessing took 8
+minutes on 6 CPUs and peaked at 10.1 GiB, the build is 4 GB on disk, and the
+server holds 2.7 GiB. Each cap is about 1.5 times its measurement
+(`OSRM_PREPARE_MEMORY=16g`, `OSRM_MEMORY=5g`). During a swap two servers run,
+and the host also needs room for the preprocessing peak, so budget about 22 GiB.
+For another extract, run once with a generous cap, read the peak from the log
+or the success ping, and set the caps from it.
+
 ## Monitoring
 
-`watch.sh` skips its pass while a deploy holds the lock, then checks readiness, that `db` and `api` run and are healthy, restarts
+`watch.sh` skips its pass while a deploy holds the lock, then checks readiness, that `db` and `api` run and are healthy
+(and the routing container, when `OSRM_URL` is set), restarts
 since the previous pass, each container's memory against its limit (90%), disk
 (85%) and the host's available memory (10%). The result goes to `HC_WATCH_URL`,
 a [healthchecks.io](https://healthchecks.io)-style ping URL: success pings the
@@ -126,6 +174,8 @@ URL, failure posts the list of problems to `/fail`. Give the check a one-minute
 period and a one-minute grace, and an outage reaches you within two minutes.
 
 `backup.sh` pings `HC_BACKUP_URL` at `/start`, on success, and at `/fail`.
+`update-osrm.sh` does the same with `HC_OSRM_URL`, reporting the build's
+preprocessing time and peak memory on success; give that check a one-week period.
 
 ## Restoring
 

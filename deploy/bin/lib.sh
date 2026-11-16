@@ -24,6 +24,22 @@ container_of() {
     --filter "label=com.docker.compose.service=$1" | head -n 1
 }
 
+# Routing containers carry a label of their own: under the compose project label,
+# compose would call them orphans and offer to remove them.
+OSRM_LABEL="geo.osrm-of=$PROJECT"
+OSRM_VERSION_LABEL=geo.osrm-version
+
+osrm_containers() {
+  docker ps "$@" --filter "label=$OSRM_LABEL"
+}
+
+# The build .osrm-version records, leaving out a new one still being checked.
+recorded_osrm() {
+  local version
+  version="$(cat .osrm-version 2> /dev/null || true)"
+  [ -z "$version" ] || osrm_containers "$@" --filter "label=$OSRM_VERSION_LABEL=$version"
+}
+
 # Asked from inside the container: from the host, a request arrives from the
 # Docker gateway address, which ALLOWED_IPS does not list.
 ready() {
