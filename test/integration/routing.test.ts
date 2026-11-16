@@ -72,7 +72,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await resetDatabase(routed.pool);
-  key = await createApiKey(routed.pool, 1, 'tourapi');
+  key = await createApiKey(routed.pool, 1, 'routing-client');
   stub.paths.length = 0;
   stub.answer = { status: 200, body: okRoute(1000, 60, 'osm-2026-11-14') };
 });
