@@ -152,10 +152,47 @@ other endpoint works without it:
 docker compose --profile routing up -d
 ```
 
-The default extract is Monaco, which processes in seconds. Point
-`OSRM_REGION_URL` at any [Geofabrik](https://download.geofabrik.de/) extract
-for a real region, and set `OSRM_URL=http://localhost:5000` in `.env`. Without
-it, `/routing/*` answers `503` and nothing else changes.
+The default extract is Monaco, which processes in seconds. For a real region
+set `OSRM_REGION_NAME` and `OSRM_REGION_URL` in `.env` to any
+[Geofabrik](https://download.geofabrik.de/) extract; `.env.example` has Turkey.
+Measured on Turkey (a 654 MB extract): about six minutes, a 10.2 GB memory peak
+during `osrm-extract`, 4.5 GB on disk, and 2.7 GB held by the running server.
+Docker Desktop's default memory limit is too small for that peak; raise it to
+12 GB. The data is processed once and reused on every later start.
+
+Tell the API where OSRM is: `API_OSRM_URL=http://osrm:5000` for the API
+container, or `OSRM_URL=http://localhost:5000` for a service run on the host.
+Without it, `/routing/*` answers `503` and nothing else changes.
+
+To switch regions, remove only the routing volume, so the database survives:
+
+```bash
+docker compose --profile routing down
+docker volume rm postgis-geo-service_osrm-data
+docker compose --profile routing up -d
+```
+
+The running server keeps the map in memory, so stop it when you are not routing:
+`docker compose stop osrm`.
+
+#### Road distance between two points
+
+```bash
+curl -X POST http://localhost:3000/api/v1/routing/route \
+  -H 'x-api-key: gsk_...' -H 'content-type: application/json' \
+  -d '{"origin": {"lat": 41.2753, "lng": 28.7519},
+       "destination": {"lat": 41.0739, "lng": 28.2464}}'
+```
+
+```json
+{ "road_distance_km": 71.25, "duration_min": 76.2, "data_version": "osm-2026-11-16" }
+```
+
+Car profile, no traffic. `data_version` names the map the answer came from.
+Answers are cached for a day per pair of points rounded to about a metre, and a
+map update retires them. A point with no drivable road within 1 km answers
+`422 point-not-routable`; two points no road connects answer
+`422 route-not-found`.
 
 ---
 
@@ -173,6 +210,7 @@ it enforces.
 | `DELETE` | `/api/v1/geofences/{id}`       | Delete a geofence                              |
 | `GET`    | `/api/v1/geofences/containing` | Geofences covering a point                     |
 | `POST`   | `/api/v1/routing/distances`    | Road distance and duration to many entities    |
+| `POST`   | `/api/v1/routing/route`        | Road distance and duration between two points  |
 | `POST`   | `/api/v1/admin/keys`           | Issue an API key                               |
 | `GET`    | `/api/v1/admin/keys`           | List keys by prefix                            |
 | `DELETE` | `/api/v1/admin/keys/{prefix}`  | Revoke a key                                   |

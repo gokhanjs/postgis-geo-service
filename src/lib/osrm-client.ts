@@ -10,6 +10,10 @@ export interface OsrmTableResponse {
 
 const REQUEST_TIMEOUT_MS = 5_000;
 
+// OSRM snaps any coordinate to the nearest road however far it is, which would
+// price an address at sea or on a car-free island from a road kilometres away.
+const SNAP_RADIUS_M = 1_000;
+
 // Swapping the routing container closes pooled keep-alive sockets, so a failed
 // connection is retried once; a timeout or an HTTP error is an answer.
 async function fetchWithReconnect(url: string): Promise<Response> {
@@ -48,6 +52,45 @@ export async function queryOsrmTable(
     if (data.code !== 'Ok') return null;
 
     return data;
+  } catch {
+    return null;
+  }
+}
+
+export type OsrmRouteOutcome =
+  | { code: 'Ok'; distance: number; duration: number; data_version: string | null }
+  | { code: 'NoRoute' }
+  | { code: 'NoSegment' };
+
+/** Fastest car route between two points; null means routing is unavailable, as for the table query. */
+export async function queryOsrmRoute(
+  baseUrl: string,
+  origin: Coordinate,
+  destination: Coordinate,
+): Promise<OsrmRouteOutcome | null> {
+  const url = `${baseUrl}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false&radiuses=${SNAP_RADIUS_M};${SNAP_RADIUS_M}`;
+
+  try {
+    const res = await fetchWithReconnect(url);
+    // OSRM reports NoRoute and NoSegment with a 400, so that body is an answer, not an error.
+    if (res.status !== 200 && res.status !== 400) return null;
+
+    const data = (await res.json()) as {
+      code?: string;
+      routes?: { distance: number; duration: number }[];
+      data_version?: string;
+    };
+    if (data.code === 'NoRoute' || data.code === 'NoSegment') return { code: data.code };
+
+    const best = data.routes?.[0];
+    if (data.code !== 'Ok' || best === undefined) return null;
+
+    return {
+      code: 'Ok',
+      distance: best.distance,
+      duration: best.duration,
+      data_version: data.data_version ?? null,
+    };
   } catch {
     return null;
   }

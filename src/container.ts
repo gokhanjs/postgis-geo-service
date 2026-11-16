@@ -1,3 +1,4 @@
+import { LRUCache } from 'lru-cache';
 import type { Pool } from 'pg';
 import type { Config } from './config/index.ts';
 import { TaggedCache } from './lib/tagged-cache.ts';
@@ -8,7 +9,7 @@ import { GeofenceRepository, type GeofenceMatch } from './repositories/geofence.
 import { CredentialService } from './services/credential.service.ts';
 import { EntityService, type NearbyPage } from './services/entity.service.ts';
 import { HealthService } from './services/health.service.ts';
-import { RoutingService } from './services/routing.service.ts';
+import { RoutingService, type PairRoute } from './services/routing.service.ts';
 import { GeofenceService } from './services/geofence.service.ts';
 
 export interface Services {
@@ -35,7 +36,11 @@ export function buildServices(pool: Pool, config: Config): Services {
     entities: new EntityService(entityRepository, entityCache),
     geofences: new GeofenceService(new GeofenceRepository(pool), geofenceCache),
     credentials: new CredentialService(new CredentialRepository(pool)),
-    routing: new RoutingService(entityRepository, config.osrmUrl),
+    routing: new RoutingService(
+      entityRepository,
+      config.osrmUrl,
+      new LRUCache<string, PairRoute>(config.routeCache),
+    ),
     health: new HealthService(new HealthRepository(pool), config.osrmUrl),
   };
 }
