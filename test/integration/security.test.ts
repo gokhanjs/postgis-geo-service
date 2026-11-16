@@ -29,7 +29,7 @@ describe('credential storage', () => {
 
     // The issued key works, and yet appears nowhere in the table.
     const authorised = await fetch(
-      `${server.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant`,
+      `${server.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=site`,
       { headers: { 'x-api-key': key } },
     );
     expect(authorised.status).toBe(200);
@@ -76,7 +76,7 @@ describe('rate limiting', () => {
   it('meters each tenant separately rather than each address', async () => {
     const spender = await createApiKey(server.pool, 91, 'quota-spender');
     const otherKey = await createApiKey(server.pool, 92, 'quota-neighbour');
-    const url = `${server.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant`;
+    const url = `${server.baseUrl}/api/v1/entities/nearby?lat=41&lng=29&entity_type=site`;
 
     // Both share one address, which an address-keyed limiter would conflate.
     const statuses: number[] = [];
@@ -145,6 +145,6 @@ function syncGeofence(area: unknown) {
   return fetch(`${server.baseUrl}/api/v1/geofences/1`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
-    body: JSON.stringify({ entity_id: 'r1', entity_type: 'restaurant', area, is_active: true }),
+    body: JSON.stringify({ entity_id: 'r1', entity_type: 'site', area, is_active: true }),
   });
 }

@@ -15,7 +15,7 @@ systems, over one deployment.
 | How far by road, and how long?        | `POST /api/v1/routing/distances`   |
 
 The service stores **geometry, not domain objects**. It never learns what a
-restaurant is; it stores that some entity of some type, belonging to some
+caller's object is; it stores that some entity of some type, belonging to some
 tenant, sits at a coordinate or serves a polygon. Everything else stays in the
 system that owns it. That is what makes one deployment serve unrelated
 products.
@@ -25,7 +25,7 @@ products.
 ## Contents
 
 - [Why this exists](#why-this-exists)
-- [Worked example: food delivery](#worked-example-food-delivery)
+- [Worked example: service areas](#worked-example-service-areas)
 - [Quick start](#quick-start)
 - [API](#api)
 - [Architecture](#architecture)
@@ -54,36 +54,37 @@ someone else's rows. See [Tenant isolation](#tenant-isolation).
 
 ---
 
-## Worked example: food delivery
+## Worked example: service areas
 
-A delivery product asks three questions, and this service answers all of them.
+Any product with sites that each serve an area asks three questions, and this
+service answers all of them.
 
-**1. Register a restaurant and the area it delivers to.**
+**1. Register a site and the area it serves.**
 
 ```bash
-curl -X PUT http://localhost:3000/api/v1/entities/restaurant/rest-42 \
+curl -X PUT http://localhost:3000/api/v1/entities/site/site-42 \
   -H 'x-api-key: gsk_...' -H 'content-type: application/json' \
   -d '{"lat": 41.0082, "lng": 28.9784, "is_active": true}'
 
 curl -X PUT http://localhost:3000/api/v1/geofences/42 \
   -H 'x-api-key: gsk_...' -H 'content-type: application/json' \
   -d '{
-        "entity_id": "rest-42",
-        "entity_type": "restaurant",
+        "entity_id": "site-42",
+        "entity_type": "site",
         "is_active": true,
         "area": {"type": "Polygon", "coordinates": [[[28.96,40.99],[28.99,40.99],[28.99,41.02],[28.96,41.02],[28.96,40.99]]]}
       }'
 ```
 
-**2. A customer opens the app. Who delivers to their address?**
+**2. A request names an address. Which sites cover it?**
 
 ```bash
-curl 'http://localhost:3000/api/v1/geofences/containing?lat=41.0082&lng=28.9784&entity_type=restaurant' \
+curl 'http://localhost:3000/api/v1/geofences/containing?lat=41.0082&lng=28.9784&entity_type=site' \
   -H 'x-api-key: gsk_...'
 ```
 
 ```json
-{ "results": [{ "entity_id": "rest-42" }] }
+{ "results": [{ "entity_id": "site-42" }] }
 ```
 
 **3. Order the results by real driving time, not straight-line distance.**
@@ -92,23 +93,23 @@ curl 'http://localhost:3000/api/v1/geofences/containing?lat=41.0082&lng=28.9784&
 curl -X POST http://localhost:3000/api/v1/routing/distances \
   -H 'x-api-key: gsk_...' -H 'content-type: application/json' \
   -d '{"origin": {"lat": 41.0189, "lng": 28.9647},
-       "destinations": [{"entity_id": "rest-42", "entity_type": "restaurant"}]}'
+       "destinations": [{"entity_id": "site-42", "entity_type": "site"}]}'
 ```
 
 ```json
 [
   {
-    "entity_id": "rest-42",
-    "entity_type": "restaurant",
+    "entity_id": "site-42",
+    "entity_type": "site",
     "road_distance_km": 2.4,
     "duration_min": 7.5
   }
 ]
 ```
 
-Nothing above is delivery-specific. Replace `restaurant` with `warehouse`,
-`courier`, `charging_station` or `service_technician` and the same three
-questions still hold.
+Nothing above is specific to one industry. Replace `site` with `hotel`,
+`pickup_point`, `warehouse` or `charging_station` and the same three questions
+still hold.
 
 ---
 

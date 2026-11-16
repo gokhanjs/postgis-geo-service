@@ -49,7 +49,7 @@ function putGeofence(key: string, id: number, body: unknown) {
 }
 
 function polygonBody(entityId: string, area: unknown) {
-  return { entity_id: entityId, entity_type: 'restaurant', area, is_active: true };
+  return { entity_id: entityId, entity_type: 'site', area, is_active: true };
 }
 
 describe('health', () => {
@@ -84,14 +84,14 @@ describe('documentation', () => {
 
 describe('authentication', () => {
   it('rejects a request with no API key', async () => {
-    const res = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant');
+    const res = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=site');
     expect(res.status).toBe(401);
     expect(res.headers.get('content-type')).toContain('application/problem+json');
     expect(await res.json()).toMatchObject({ status: 401, title: 'Missing API key' });
   });
 
   it('rejects an unknown API key', async () => {
-    const res = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant', 'gsk_no');
+    const res = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=site', 'gsk_no');
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ title: 'Invalid or inactive API key' });
   });
@@ -130,7 +130,7 @@ describe('admin key management', () => {
     expect(revoked.status).toBe(200);
 
     const afterRevoke = await get(
-      '/api/v1/entities/nearby?lat=41&lng=29&entity_type=restaurant',
+      '/api/v1/entities/nearby?lat=41&lng=29&entity_type=site',
       issued.key,
     );
     expect(afterRevoke.status).toBe(401);
@@ -139,7 +139,7 @@ describe('admin key management', () => {
 
 describe('entities', () => {
   it('stores a location and finds it within the radius', async () => {
-    const put = await putEntity(keyA, 'restaurant', 'r1', {
+    const put = await putEntity(keyA, 'site', 'r1', {
       lat: 41.0,
       lng: 29.0,
       is_active: true,
@@ -147,7 +147,7 @@ describe('entities', () => {
     expect(put.status).toBe(200);
 
     const res = await get(
-      '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant&radius_km=1',
+      '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=site&radius_km=1',
       keyA,
     );
     const page = (await res.json()) as { results: Array<{ entity_id: string }> };
@@ -155,25 +155,25 @@ describe('entities', () => {
   });
 
   it('excludes entities beyond the radius and inactive ones', async () => {
-    await putEntity(keyA, 'restaurant', 'far', { lat: 41.5, lng: 29.0, is_active: true });
-    await putEntity(keyA, 'restaurant', 'off', { lat: 41.0, lng: 29.0, is_active: false });
+    await putEntity(keyA, 'site', 'far', { lat: 41.5, lng: 29.0, is_active: true });
+    await putEntity(keyA, 'site', 'off', { lat: 41.0, lng: 29.0, is_active: false });
 
     const res = await get(
-      '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant&radius_km=1',
+      '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=site&radius_km=1',
       keyA,
     );
     expect(await res.json()).toEqual({ results: [], next_cursor: null });
   });
 
   it('keeps one tenant from reading another tenant location', async () => {
-    await putEntity(keyA, 'restaurant', 'secret', { lat: 41.0, lng: 29.0, is_active: true });
+    await putEntity(keyA, 'site', 'secret', { lat: 41.0, lng: 29.0, is_active: true });
 
-    const res = await get('/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant', keyB);
+    const res = await get('/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=site', keyB);
     expect(await res.json()).toEqual({ results: [], next_cursor: null });
   });
 
   it('rejects out-of-range coordinates', async () => {
-    const res = await putEntity(keyA, 'restaurant', 'bad', {
+    const res = await putEntity(keyA, 'site', 'bad', {
       lat: 999,
       lng: 29.0,
       is_active: true,
@@ -183,7 +183,7 @@ describe('entities', () => {
 
   it('walks results a page at a time', async () => {
     for (let i = 0; i < 5; i += 1) {
-      await putEntity(keyA, 'restaurant', `r${i}`, {
+      await putEntity(keyA, 'site', `r${i}`, {
         lat: 41.0 + i * 0.001,
         lng: 29.0,
         is_active: true,
@@ -195,7 +195,7 @@ describe('entities', () => {
 
     do {
       const url =
-        '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=restaurant&limit=2' +
+        '/api/v1/entities/nearby?lat=41.0&lng=29.0&entity_type=site&limit=2' +
         (cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`);
       const page = (await (await get(url, keyA)).json()) as {
         results: Array<{ entity_id: string }>;
@@ -213,10 +213,7 @@ describe('geofences', () => {
   it('stores a polygon and reports the entities covering a point', async () => {
     await putGeofence(keyA, 100, polygonBody('r1', squarePolygon(29.0, 41.0)));
 
-    const res = await get(
-      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant',
-      keyA,
-    );
+    const res = await get('/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=site', keyA);
     expect(await res.json()).toEqual({ results: [{ entity_id: 'r1' }] });
   });
 
@@ -224,13 +221,13 @@ describe('geofences', () => {
     await putGeofence(keyA, 101, polygonBody('r1', squarePolygon(29.0, 41.0)));
 
     const inside = await get(
-      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant&entity_id=r1',
+      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=site&entity_id=r1',
       keyA,
     );
     expect(await inside.json()).toEqual({ inside: true });
 
     const outside = await get(
-      '/api/v1/geofences/containing?lat=42.0&lng=29.0&entity_type=restaurant&entity_id=r1',
+      '/api/v1/geofences/containing?lat=42.0&lng=29.0&entity_type=site&entity_id=r1',
       keyA,
     );
     expect(await outside.json()).toEqual({ inside: false });
@@ -268,10 +265,7 @@ describe('geofences', () => {
     await putGeofence(keyA, 201, polygonBody('west', west));
     await putGeofence(keyA, 202, polygonBody('east', east));
 
-    const res = await get(
-      '/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=restaurant',
-      keyA,
-    );
+    const res = await get('/api/v1/geofences/containing?lat=41.0&lng=29.0&entity_type=site', keyA);
     const { results } = (await res.json()) as { results: Array<{ entity_id: string }> };
     expect(results.map((r) => r.entity_id).sort()).toEqual(['east', 'west']);
   });
@@ -284,7 +278,7 @@ describe('routing', () => {
       '/api/v1/routing/distances',
       {
         origin: { lat: 41.0, lng: 29.0 },
-        destinations: [{ entity_id: 'r1', entity_type: 'restaurant' }],
+        destinations: [{ entity_id: 'r1', entity_type: 'site' }],
       },
       { 'x-api-key': keyA },
     );

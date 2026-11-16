@@ -15,7 +15,7 @@ const EntityType = Type.String({
   minLength: 1,
   maxLength: 100,
   pattern: IDENTIFIER_PATTERN,
-  description: 'Caller-defined category, for example "restaurant" or "courier".',
+  description: 'Caller-defined category, for example "site" or "vehicle".',
 });
 
 export const EntityPathParams = Type.Object({ type: EntityType, id: EntityId });
