@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
-RUN corepack enable
+# Node 25 stopped bundling corepack; it still resolves pnpm from packageManager.
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /app
 
 # Resolved from the lockfile alone, so the layer survives source changes.
@@ -22,7 +23,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
 
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 
 # Forwards signals, so the shutdown handler receives SIGTERM.

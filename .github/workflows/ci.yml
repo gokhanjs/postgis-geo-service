@@ -15,22 +15,11 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: geo_service_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
 
     env:
       DB_HOST: 127.0.0.1
@@ -55,6 +44,11 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level=moderate
+
+      # The database is our own image, built here as on a developer machine,
+      # because no published PostGIS image covers both architectures.
+      - run: docker compose up -d --wait db
 
       - run: pnpm typecheck
       - run: pnpm lint

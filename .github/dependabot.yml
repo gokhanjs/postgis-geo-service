@@ -9,7 +9,12 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: docker
-    directory: /docker
+    directories: [/docker, /docker/postgis]
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: docker-compose
+    directory: /
     schedule:
       interval: monthly
 

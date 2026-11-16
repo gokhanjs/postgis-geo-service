@@ -114,7 +114,7 @@ questions still hold.
 
 ## Quick start
 
-Requires Docker and Node.js 22+.
+Requires Docker and Node.js 26+.
 
 ```bash
 git clone https://github.com/gokhanjs/postgis-geo-service.git
@@ -306,7 +306,7 @@ pnpm test           # integration tests against real PostGIS
 pnpm typecheck && pnpm lint
 ```
 
-There is no `ts-node` or `tsx`: Node 22 executes TypeScript natively, and
+There is no `ts-node` or `tsx`: Node 26 executes TypeScript natively, and
 `tsc` emits `dist/` for production only.
 
 The test suite runs against a real PostGIS instance rather than mocks. Spatial
