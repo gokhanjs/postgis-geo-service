@@ -7,6 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 # A new push supersedes whatever is still running for the same ref.
 concurrency:
