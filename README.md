@@ -324,18 +324,18 @@ that the mock was written to agree with the test.
 
 ## Deployment
 
-```bash
-docker compose up -d --build
-```
+Tagged releases publish multi-arch images (`linux/amd64`, `linux/arm64`) to
+GHCR. [`deploy/`](deploy/README.md) runs them on a single Docker host: a
+production compose file with the database on an internal network and only the
+API published on loopback, a deploy script that returns to the previous version
+when the new one does not become ready, a health check and a nightly backup on
+systemd timers, and an nginx configuration with TLS, edge rate limiting, and the
+`X-Forwarded-For` handling the service's proxy trust depends on.
 
 The image is multi-stage, runs as a non-root user under `dumb-init` so
 shutdown receives `SIGTERM`, and reports health on `/health/live`. Migrations
 run as a separate one-shot service that must succeed before the API starts,
 because the API's own database role is created by a migration.
-
-For a bare-metal deployment behind nginx, [`deploy/nginx/`](deploy/nginx/)
-carries a configuration with TLS, edge rate limiting, and the
-`X-Forwarded-For` handling the service's proxy trust depends on.
 
 ---
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=postgis-geo-service database backup
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30min
+ExecStart=/opt/postgis-geo-service/bin/backup.sh
