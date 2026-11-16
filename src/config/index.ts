@@ -57,6 +57,9 @@ export const config = {
   /** Absent or empty means routing is disabled; compose passes through empty. */
   osrmUrl: process.env.OSRM_URL || null,
 
+  /** Where published reference datasets live; absent lists none. */
+  datasetsDir: process.env.DATASETS_DIR || null,
+
   /** Absent means no network restriction. */
   allowedIps: (() => {
     const ips = parseList(process.env.ALLOWED_IPS);

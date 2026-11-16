@@ -22,6 +22,7 @@ export default fp(
           { name: 'entities', description: 'Point locations and proximity search.' },
           { name: 'geofences', description: 'Service-area polygons and containment.' },
           { name: 'routing', description: 'Road distance and duration via OSRM.' },
+          { name: 'datasets', description: 'Versioned reference data: boundaries and places.' },
           { name: 'admin', description: 'API key issuance and revocation.' },
           { name: 'health', description: 'Liveness and readiness.' },
         ],

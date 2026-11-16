@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import pg from 'pg';
-import { adminPoolConfig } from '../helpers/env.js';
+import { adminPoolConfig, appPoolConfig } from '../helpers/env.js';
 
 /**
  * Drives scripts/datasets/process.sql against real PostGIS with a synthetic map,
@@ -312,5 +312,26 @@ describe('place processing', () => {
       { name: 'Gebze Otogarı', type: 'station', province_code: '41' },
       { name: 'Pier Head', type: 'port', province_code: '34' },
     ]);
+  });
+
+  it('gives a point on a border two provinces share to the smaller code, once', async () => {
+    await insertPlace('station', 'Border Terminal', 20, 3);
+    await runProcess();
+
+    const { rows } = await admin.query('SELECT province_code FROM reference.places');
+    expect(rows).toEqual([{ province_code: '34' }]);
+  });
+});
+
+describe('reference schema', () => {
+  it('is out of reach of the service role, which serves the exported files instead', async () => {
+    const app = new pg.Pool(appPoolConfig);
+    try {
+      await expect(app.query('SELECT code FROM reference.districts')).rejects.toThrow(
+        /permission denied for schema reference/,
+      );
+    } finally {
+      await app.end();
+    }
   });
 });

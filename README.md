@@ -6,7 +6,9 @@
 
 A multi-tenant geospatial service: proximity search, geofencing, and road
 distance. It answers three questions for any number of independent client
-systems, over one deployment.
+systems, over one deployment, and publishes versioned reference datasets
+(Turkey's provinces, districts, airports, ports and bus stations) that clients
+copy.
 
 | Question                              | Endpoint                           |
 | ------------------------------------- | ---------------------------------- |
@@ -194,6 +196,19 @@ map update retires them. A point with no drivable road within 1 km answers
 `422 point-not-routable`; two points no road connects answer
 `422 route-not-found`.
 
+### Reference datasets
+
+`tr-admin` holds Turkey's 81 provinces and 973 districts with stable codes
+(`34-beyoglu`); `tr-places` holds airports, cruise and passenger ports, and
+intercity bus stations. `bin/update-datasets.sh` rebuilds them monthly from
+OpenStreetMap and OurAirports and publishes a version only if it passes a gate
+that, among other checks, refuses a release in which a code has disappeared.
+Sources, selection rules and codes are in [`docs/datasets.md`](docs/datasets.md).
+
+```bash
+curl -H 'x-api-key: gsk_...' http://localhost:3000/api/v1/datasets/tr-admin/latest/manifest
+```
+
 ---
 
 ## API
@@ -202,19 +217,22 @@ Full reference at `/docs`, generated from the same TypeBox schemas the service
 validates against, so the request and response shapes it documents are the ones
 it enforces.
 
-| Method   | Path                           | Purpose                                        |
-| -------- | ------------------------------ | ---------------------------------------------- |
-| `PUT`    | `/api/v1/entities/{type}/{id}` | Create or replace an entity's location         |
-| `GET`    | `/api/v1/entities/nearby`      | Entities within a radius, nearest first, paged |
-| `PUT`    | `/api/v1/geofences/{id}`       | Create or replace a geofence                   |
-| `DELETE` | `/api/v1/geofences/{id}`       | Delete a geofence                              |
-| `GET`    | `/api/v1/geofences/containing` | Geofences covering a point                     |
-| `POST`   | `/api/v1/routing/distances`    | Road distance and duration to many entities    |
-| `POST`   | `/api/v1/routing/route`        | Road distance and duration between two points  |
-| `POST`   | `/api/v1/admin/keys`           | Issue an API key                               |
-| `GET`    | `/api/v1/admin/keys`           | List keys by prefix                            |
-| `DELETE` | `/api/v1/admin/keys/{prefix}`  | Revoke a key                                   |
-| `GET`    | `/health/live` `/health/ready` | Liveness and readiness                         |
+| Method   | Path                                             | Purpose                                        |
+| -------- | ------------------------------------------------ | ---------------------------------------------- |
+| `PUT`    | `/api/v1/entities/{type}/{id}`                   | Create or replace an entity's location         |
+| `GET`    | `/api/v1/entities/nearby`                        | Entities within a radius, nearest first, paged |
+| `PUT`    | `/api/v1/geofences/{id}`                         | Create or replace a geofence                   |
+| `DELETE` | `/api/v1/geofences/{id}`                         | Delete a geofence                              |
+| `GET`    | `/api/v1/geofences/containing`                   | Geofences covering a point                     |
+| `POST`   | `/api/v1/routing/distances`                      | Road distance and duration to many entities    |
+| `POST`   | `/api/v1/routing/route`                          | Road distance and duration between two points  |
+| `GET`    | `/api/v1/datasets`                               | Reference datasets and their versions          |
+| `GET`    | `/api/v1/datasets/{name}/{version}/manifest`     | Files, digests, sources and licence            |
+| `GET`    | `/api/v1/datasets/{name}/{version}/files/{file}` | One file of a version                          |
+| `POST`   | `/api/v1/admin/keys`                             | Issue an API key                               |
+| `GET`    | `/api/v1/admin/keys`                             | List keys by prefix                            |
+| `DELETE` | `/api/v1/admin/keys/{prefix}`                    | Revoke a key                                   |
+| `GET`    | `/health/live` `/health/ready`                   | Liveness and readiness                         |
 
 Spatial routes authenticate with `x-api-key`, which also identifies the tenant.
 Admin routes use `x-admin-token`.
@@ -327,6 +345,7 @@ spatial queries as `geo_app` and fail if the predicate leaves the index.
 | `DB_USER` / `DB_PASS`                     | `geo_app`  | The restricted runtime role                             |
 | `MIGRATION_DB_USER` / `MIGRATION_DB_PASS` | `postgres` | Owner, for DDL only                                     |
 | `OSRM_URL`                                | unset      | Unset disables routing; every other route is unaffected |
+| `DATASETS_DIR`                            | unset      | Published reference datasets; unset lists none          |
 | `ALLOWED_IPS`                             | unset      | Unset accepts any address                               |
 | `TRUST_PROXY_HOPS`                        | unset      | Set **only** if the proxy overwrites `X-Forwarded-For`  |
 | `CORS_ORIGINS`                            | unset      | Unset refuses cross-origin requests                     |
@@ -403,4 +422,6 @@ reviewer agent that checks queries for the mistakes listed above.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The reference datasets the service publishes
+contain OpenStreetMap data and are licensed separately, under ODbL 1.0 (see
+[`docs/datasets.md`](docs/datasets.md#licences)).
