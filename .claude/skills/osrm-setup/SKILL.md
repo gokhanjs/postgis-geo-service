@@ -37,20 +37,23 @@ docker compose --profile routing up -d
 ```
 
 Change the region by setting `OSRM_REGION_NAME` and `OSRM_REGION_URL` in
-`.env`, then remove the volume so preprocessing runs again:
+`.env`, then remove only the routing volume so preprocessing runs again. Never
+`down -v`: that also deletes the database volume.
 
 ```bash
-docker compose down -v --remove-orphans
+docker compose --profile routing down
+docker volume rm postgis-geo-service_osrm-data
 docker compose --profile routing up -d
 ```
 
-Then set `OSRM_URL=http://localhost:5000` and restart the API.
+Then set `API_OSRM_URL=http://osrm:5000` for the API container, or
+`OSRM_URL=http://localhost:5000` for a service run on the host, and restart it.
 
 ## A deployed host
 
-`scripts/osrm-update.ts` refreshes data in place and restarts the serving
-container. It expects `OSRM_REGION`, `OSRM_DATA_PATH` and optionally
-`OSRM_CONTAINER_NAME`.
+`deploy/bin/update-osrm.sh` builds each refresh beside the serving one and
+swaps it in only after a known route checks out; `deploy/README.md` (Routing)
+covers the variables, the first run, the weekly timer and `--rollback`.
 
 ## Verifying
 
@@ -69,7 +72,8 @@ distance as `null` rather than failing.
 - **`NoRoute` for coordinates you expect to work.** The extract does not cover
   them. Check the region bounds before suspecting the service.
 - **Preprocessing killed with no error.** Out of memory. Use a smaller extract
-  or raise the Docker memory limit.
+  or raise the Docker memory limit (`OSRM_PREPARE_MEMORY` on a deployed host,
+  where the script reports the kill and the peak it reached).
 - **`osrm-routed` exits immediately.** The `--algorithm` flag disagrees with how
   the data was prepared.
 - **Health says `unreachable` while the container is running.** Preprocessing

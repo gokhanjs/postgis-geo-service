@@ -21,8 +21,7 @@
     "db:down": "docker compose down",
     "migrate": "node scripts/migrate.ts up",
     "migrate:down": "node scripts/migrate.ts down",
-    "generate:token": "node scripts/generate-token.ts",
-    "osrm:update": "node scripts/osrm-update.ts"
+    "generate:token": "node scripts/generate-token.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.4.3",
