@@ -67,6 +67,10 @@ services:
       # Not ${OSRM_URL}: that is the host-side localhost address for a service
       # run outside Docker; this container reaches OSRM by service name.
       OSRM_URL: ${API_OSRM_URL:-}
+      DATASETS_DIR: /datasets
+    volumes:
+      # Packages built by scripts/datasets/update.ts with --out .local/datasets.
+      - ./.local/datasets:/datasets:ro
     ports:
       - '127.0.0.1:${PORT:-3000}:3000'
 
