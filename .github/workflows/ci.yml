@@ -100,6 +100,9 @@ jobs:
       MIGRATION_DB_USER: postgres
       MIGRATION_DB_PASS: postgres
       OSRM_URL: http://127.0.0.1:5000
+      # Runners are intermittently refused by download.geofabrik.de, so the
+      # engine is built from the extract pinned in the repository.
+      OSRM_REGION_URL: file:///fixtures/monaco.osm.pbf
 
     steps:
       - uses: actions/checkout@v7
