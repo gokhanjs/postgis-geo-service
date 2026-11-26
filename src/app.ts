@@ -8,7 +8,6 @@ import errorHandlerPlugin from './plugins/error-handler.ts';
 import openapiPlugin from './plugins/openapi.ts';
 import securityPlugin from './plugins/security.ts';
 import tenantQuotaPlugin from './plugins/tenant-quota.ts';
-import adminRoutes from './routes/admin.ts';
 import entityRoutes from './routes/entities.ts';
 import healthRoutes from './routes/health.ts';
 import routingRoutes from './routes/routing.ts';
@@ -47,7 +46,6 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(authPlugin);
 
   await app.register(healthRoutes);
-  await app.register(adminRoutes);
   await app.register(entityRoutes);
   await app.register(geofenceRoutes);
   await app.register(routingRoutes);

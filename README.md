@@ -133,13 +133,13 @@ That brings up PostGIS, applies the migrations, and starts the API on port 3000.
 curl http://localhost:3000/health/ready
 ```
 
-Then issue yourself credentials:
+Then issue yourself a key. Keys are managed from the command line, as the
+database owner, never over HTTP:
 
 ```bash
-pnpm generate:token                       # prints an admin token, once
-curl -X POST http://localhost:3000/api/v1/admin/keys \
-  -H "x-admin-token: gat_..." -H 'content-type: application/json' \
-  -d '{"tenant_id": 1, "project_name": "acme-delivery"}'
+pnpm keys issue --tenant 1 --project acme-delivery   # prints the key, once
+pnpm keys list                                       # prefixes, never keys
+pnpm keys revoke gsk_1a2b3c4d
 ```
 
 Browse the API at **http://localhost:3000/docs**.
@@ -229,13 +229,11 @@ it enforces.
 | `GET`    | `/api/v1/datasets`                               | Reference datasets and their versions          |
 | `GET`    | `/api/v1/datasets/{name}/{version}/manifest`     | Files, digests, sources and licence            |
 | `GET`    | `/api/v1/datasets/{name}/{version}/files/{file}` | One file of a version                          |
-| `POST`   | `/api/v1/admin/keys`                             | Issue an API key                               |
-| `GET`    | `/api/v1/admin/keys`                             | List keys by prefix                            |
-| `DELETE` | `/api/v1/admin/keys/{prefix}`                    | Revoke a key                                   |
 | `GET`    | `/health/live` `/health/ready`                   | Liveness and readiness                         |
 
-Spatial routes authenticate with `x-api-key`, which also identifies the tenant.
-Admin routes use `x-admin-token`.
+Every route but health authenticates with `x-api-key`, which also identifies
+the tenant. There is no admin route: keys are issued out of band
+([ADR 0008](docs/adr/0008-credentials-issued-out-of-band.md)).
 
 ### Errors
 

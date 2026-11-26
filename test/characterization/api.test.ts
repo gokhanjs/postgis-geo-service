@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { issuedKeyFrom, runKeysCli } from '../helpers/keys-cli.js';
 import { startTestServer, type TestServer } from '../helpers/server.js';
-import { ADMIN_TOKEN, createApiKey, resetDatabase, squarePolygon } from '../helpers/fixtures.js';
+import { createApiKey, resetDatabase, squarePolygon } from '../helpers/fixtures.js';
 
 /**
  * The service's HTTP contract, asserted against the wire rather than the source
@@ -95,45 +96,66 @@ describe('authentication', () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ title: 'Invalid or inactive API key' });
   });
-
-  it('rejects an admin request with no admin token', async () => {
-    const res = await send('POST', '/api/v1/admin/keys', { tenant_id: 1, project_name: 'x' });
-    expect(res.status).toBe(401);
-  });
 });
 
-describe('admin key management', () => {
+describe('key management CLI', () => {
   it('issues a key once, lists it by prefix, and revokes it', async () => {
-    const created = await send(
-      'POST',
-      '/api/v1/admin/keys',
-      { tenant_id: 7, project_name: 'acme-delivery' },
-      { 'x-admin-token': ADMIN_TOKEN },
-    );
-    expect(created.status).toBe(200);
+    const issued = await runKeysCli(['issue', '--tenant', '7', '--project', 'acme-delivery']);
+    expect(issued.code).toBe(0);
+    const key = issuedKeyFrom(issued.stdout);
+    const prefix = key.slice(0, 12);
 
-    const issued = (await created.json()) as { key: string };
-    expect(issued.key).toMatch(/^gsk_[0-9a-f]{48}$/);
+    const listed = await runKeysCli(['list']);
+    expect(listed.code).toBe(0);
+    expect(listed.stdout).toContain(prefix);
+    expect(listed.stdout).toContain('acme-delivery');
+    expect(listed.stdout).not.toContain(key);
 
-    const listed = await fetch(`${server.baseUrl}/api/v1/admin/keys`, {
-      headers: { 'x-admin-token': ADMIN_TOKEN },
-    });
-    const rows = (await listed.json()) as Array<{ key_prefix: string; key?: string }>;
-    const match = rows.find((r) => r.key_prefix === issued.key.slice(0, 12));
-    expect(match).toBeDefined();
-    expect(match?.key).toBeUndefined();
+    // Revoked before first use: a key the service has already resolved stays
+    // cached for up to a minute, which the CLI in another process cannot clear.
+    const revoked = await runKeysCli(['revoke', prefix]);
+    expect(revoked.code).toBe(0);
 
-    const revoked = await fetch(`${server.baseUrl}/api/v1/admin/keys/${issued.key.slice(0, 12)}`, {
-      method: 'DELETE',
-      headers: { 'x-admin-token': ADMIN_TOKEN },
-    });
-    expect(revoked.status).toBe(200);
-
-    const afterRevoke = await get(
-      '/api/v1/entities/nearby?lat=41&lng=29&entity_type=site',
-      issued.key,
-    );
+    const afterRevoke = await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=site', key);
     expect(afterRevoke.status).toBe(401);
+  });
+
+  it('fails without changing anything when the prefix matches no key', async () => {
+    const res = await runKeysCli(['revoke', 'gsk_00000000']);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain('No key');
+  });
+
+  it.each([
+    ['no tenant', ['--project', 'acme-delivery']],
+    ['a tenant in exponent notation', ['--tenant', '1e3', '--project', 'acme-delivery']],
+    ['a tenant past the column range', ['--tenant', '2147483648', '--project', 'acme-delivery']],
+    ['a non-ASCII project', ['--tenant', '1', '--project', 'acme-teslimat-ş']],
+    ['a project over 200 characters', ['--tenant', '1', '--project', 'x'.repeat(201)]],
+    ['a misspelled flag', ['--tenent', '1', '--project', 'acme-delivery']],
+  ])('refuses to issue a key given %s', async (_case, args) => {
+    const res = await runKeysCli(['issue', ...args]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain('Usage:');
+    const { rows } = await server.pool.query('SELECT 1 FROM api_keys WHERE tenant_id <> ALL($1)', [
+      [TENANT_A, TENANT_B],
+    ]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('refuses to revoke by a full key, which would land in shell history', async () => {
+    const res = await runKeysCli(['revoke', keyA]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain('prefix');
+    expect((await get('/api/v1/entities/nearby?lat=41&lng=29&entity_type=site', keyA)).status).toBe(
+      200,
+    );
+  });
+
+  it('rejects an unknown command with the usage text', async () => {
+    const res = await runKeysCli(['rotate']);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain('Usage:');
   });
 });
 

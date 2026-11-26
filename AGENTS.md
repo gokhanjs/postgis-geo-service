@@ -42,6 +42,11 @@ reported distance disagree with the filter that admitted the row.
 columns first, whether the spatial predicate reaches the index depends on the
 planner's row estimates, and on some distributions it does not.
 
+**The runtime role never writes credentials.** `geo_app` may only read
+`api_keys`; keys are issued and revoked by `scripts/keys.ts` as the owner. Do
+not add an HTTP route or a grant that lets the service mint, extend or revive a
+key. ADR 0008 has the reasoning.
+
 ## Adding an endpoint
 
 1. A TypeBox schema in `src/schemas/`. It is both the validation and the

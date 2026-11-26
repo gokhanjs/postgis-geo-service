@@ -35,16 +35,6 @@ export const problems = {
 
   invalidApiKey: () => new HttpProblem(401, 'invalid-api-key', 'Invalid or inactive API key'),
 
-  missingAdminToken: () =>
-    new HttpProblem(
-      401,
-      'missing-admin-token',
-      'Missing admin token',
-      'Send the token in x-admin-token.',
-    ),
-
-  invalidAdminToken: () => new HttpProblem(401, 'invalid-admin-token', 'Invalid admin token'),
-
   forbiddenAddress: () =>
     new HttpProblem(403, 'address-not-allowed', 'Address not allowed by the server policy'),
 

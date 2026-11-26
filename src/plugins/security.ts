@@ -11,7 +11,7 @@ export default fp(
     await app.register(cors, {
       origin: config.corsOrigins ?? false,
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      allowedHeaders: ['content-type', 'x-api-key', 'x-admin-token'],
+      allowedHeaders: ['content-type', 'x-api-key'],
       maxAge: 86_400,
     });
 

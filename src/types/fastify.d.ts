@@ -8,7 +8,6 @@ declare module 'fastify' {
     pg: pg.Pool;
     services: Services;
     authenticateApiKey: preHandlerHookHandler;
-    authenticateAdmin: preHandlerHookHandler;
     /** Charges one request against the tenant's quota, raising 429 when spent. */
     chargeTenantQuota: (tenantId: number) => void;
   }

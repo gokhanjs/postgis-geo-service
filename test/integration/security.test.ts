@@ -1,6 +1,9 @@
+import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { appPoolConfig } from '../helpers/env.js';
+import { issuedKeyFrom, runKeysCli } from '../helpers/keys-cli.js';
 import { startTestServer, type TestServer } from '../helpers/server.js';
-import { ADMIN_TOKEN, createApiKey, resetDatabase, squarePolygon } from '../helpers/fixtures.js';
+import { createApiKey, resetDatabase, squarePolygon } from '../helpers/fixtures.js';
 
 let server: TestServer;
 let apiKey: string;
@@ -20,12 +23,9 @@ beforeEach(async () => {
 
 describe('credential storage', () => {
   it('never writes a usable credential to the database', async () => {
-    const created = await fetch(`${server.baseUrl}/api/v1/admin/keys`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
-      body: JSON.stringify({ tenant_id: 9, project_name: 'acme-delivery' }),
-    });
-    const { key } = (await created.json()) as { key: string };
+    const issued = await runKeysCli(['issue', '--tenant', '9', '--project', 'acme-delivery']);
+    expect(issued.code).toBe(0);
+    const key = issuedKeyFrom(issued.stdout);
 
     // The issued key works, and yet appears nowhere in the table.
     const authorised = await fetch(
@@ -37,10 +37,38 @@ describe('credential storage', () => {
     const { rows } = await server.pool.query('SELECT key_hash, key_prefix FROM api_keys');
     const stored = rows.map((r) => JSON.stringify(r)).join(' ');
     expect(stored).not.toContain(key);
-    expect(stored).not.toContain(ADMIN_TOKEN);
+  });
+});
 
-    const admin = await server.pool.query('SELECT token_hash FROM admin_tokens');
-    expect(admin.rows[0]).not.toMatchObject({ token_hash: ADMIN_TOKEN });
+describe('credential administration', () => {
+  it('offers no HTTP route to issue, list or revoke keys', async () => {
+    for (const [method, path] of [
+      ['POST', '/api/v1/admin/keys'],
+      ['GET', '/api/v1/admin/keys'],
+      ['DELETE', '/api/v1/admin/keys/gsk_00000000'],
+    ] as const) {
+      const res = await fetch(`${server.baseUrl}${path}`, {
+        method,
+        headers: { 'x-api-key': apiKey },
+      });
+      expect(res.status, `${method} ${path}`).toBe(404);
+    }
+  });
+
+  it('leaves the runtime role unable to mint or reactivate a key', async () => {
+    const app = new pg.Pool(appPoolConfig);
+    try {
+      await expect(
+        app.query(
+          "INSERT INTO api_keys (key_hash, key_prefix, tenant_id, project_name) VALUES ('x', 'gsk_x', 1, 'p')",
+        ),
+      ).rejects.toThrow(/permission denied/);
+      await expect(app.query('UPDATE api_keys SET is_active = true')).rejects.toThrow(
+        /permission denied/,
+      );
+    } finally {
+      await app.end();
+    }
   });
 });
 

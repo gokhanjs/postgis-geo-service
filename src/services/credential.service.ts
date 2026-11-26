@@ -38,12 +38,6 @@ export class CredentialService {
     return context;
   }
 
-  /** Not cached: rotation must take effect at once, and admin traffic is rare. */
-  async isValidAdminToken(token: string): Promise<boolean> {
-    const hash = hashCredential(token);
-    return await this.#credentials.adminTokenExists(hash);
-  }
-
   async issueApiKey(tenantId: number, projectName: string): Promise<IssuedKey> {
     const issued = generateApiKey();
     await this.#credentials.insertApiKey(issued.hash, issued.prefix, tenantId, projectName);

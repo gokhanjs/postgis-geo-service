@@ -15,8 +15,11 @@ Report privately through this repository's GitHub security advisory form
   query's own predicate could quote another tenant's value; repository SQL
   applies nothing that can raise to these columns. Row-level security policies
   on the tables cover any role later granted them directly.
-- **Credentials are stored as digests.** API keys and admin tokens cannot be
-  recovered from a database dump. Listing shows only a prefix.
+- **Credentials are stored as digests.** API keys cannot be recovered from a
+  database dump. Listing shows only a prefix.
+- **The service cannot mint credentials.** Its database role may only read
+  keys; they are issued and revoked from the command line as the owner
+  ([ADR 0008](docs/adr/0008-credentials-issued-out-of-band.md)).
 - **Errors do not describe the schema.** Unrecognised failures are logged in
   full server-side and answered with a generic problem document.
 

@@ -26,13 +26,6 @@ export class CredentialRepository {
     return rows[0] ?? null;
   }
 
-  async adminTokenExists(tokenHash: string): Promise<boolean> {
-    const { rows } = await this.#pool.query('SELECT 1 FROM admin_tokens WHERE token_hash = $1', [
-      tokenHash,
-    ]);
-    return rows.length > 0;
-  }
-
   async insertApiKey(
     keyHash: string,
     keyPrefix: string,

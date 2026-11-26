@@ -1,7 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const API_KEY_BYTES = 24;
-const ADMIN_TOKEN_BYTES = 32;
 
 /** Enough of the key to recognise it in a list, without being enough to use. */
 export const KEY_PREFIX_LENGTH = 12;
@@ -25,11 +24,6 @@ export function hashCredential(value: string): string {
 export function generateApiKey(): IssuedApiKey {
   const key = `gsk_${randomBytes(API_KEY_BYTES).toString('hex')}`;
   return { key, hash: hashCredential(key), prefix: key.slice(0, KEY_PREFIX_LENGTH) };
-}
-
-export function generateAdminToken(): { token: string; hash: string } {
-  const token = `gat_${randomBytes(ADMIN_TOKEN_BYTES).toString('hex')}`;
-  return { token, hash: hashCredential(token) };
 }
 
 /** Compares two hex digests without leaking their difference through timing. */
