@@ -27,7 +27,7 @@
     "@fastify/cors": "^11.4.3",
     "@fastify/helmet": "^13.2.0",
     "@fastify/rate-limit": "^11.2.2",
-    "@fastify/swagger": "^9.9.4",
+    "@fastify/swagger": "^9.9.5",
     "@fastify/swagger-ui": "^6.1.4",
     "@fastify/type-provider-typebox": "^6.3.0",
     "@sinclair/typebox": "^0.34.52",
@@ -45,9 +45,9 @@
     "globals": "^17.14.0",
     "prettier": "^3.10.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.2",
+    "typescript-eslint": "^8.73.0",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "type": "module"
 }
