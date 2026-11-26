@@ -23,13 +23,11 @@ export default fp(
           { name: 'geofences', description: 'Service-area polygons and containment.' },
           { name: 'routing', description: 'Road distance and duration via OSRM.' },
           { name: 'datasets', description: 'Versioned reference data: boundaries and places.' },
-          { name: 'admin', description: 'API key issuance and revocation.' },
           { name: 'health', description: 'Liveness and readiness.' },
         ],
         components: {
           securitySchemes: {
             apiKey: { type: 'apiKey', name: 'x-api-key', in: 'header' },
-            adminToken: { type: 'apiKey', name: 'x-admin-token', in: 'header' },
           },
         },
       },

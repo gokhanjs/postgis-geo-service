@@ -32,7 +32,7 @@ client ─443─> reverse proxy ─> 127.0.0.1:API_PORT ─> api
 | `bin/deploy.sh`                               | Starts a version, returns to the previous one on fail |
 | `bin/watch.sh`                                | One health pass, reported to a ping URL               |
 | `bin/backup.sh`                               | Nightly `pg_dump`, pruned after `BACKUP_KEEP_DAYS`    |
-| `bin/admin-token.sh`                          | Issues the admin token, revoking the previous one     |
+| `bin/api-key.sh`                              | Issues, lists and revokes API keys as the owner role  |
 | `bin/update-osrm.sh`                          | Builds routing data and swaps it in without downtime  |
 | `bin/update-datasets.sh`                      | Builds the reference datasets, published past a gate  |
 | `systemd/geo-{watch,backup}.{service,timer}`  | Every minute, and nightly at 03:30                    |
@@ -65,11 +65,13 @@ so set it before the first deploy. Values are read literally: no quotes.
 bin/deploy.sh 1.1.0
 ```
 
-Then create the admin token, which the admin API needs to issue tenants and
-their keys. Running it again revokes the previous token:
+Then issue the first tenant's key. It is printed once; only its digest is
+stored. The running service can read keys but never write them:
 
 ```bash
-bin/admin-token.sh
+bin/api-key.sh issue --tenant 1 --project acme-delivery
+bin/api-key.sh list
+bin/api-key.sh revoke gsk_1a2b3c4d   # a running api may accept it for up to a minute
 ```
 
 Enable monitoring and backups:

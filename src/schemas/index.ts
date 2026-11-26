@@ -109,23 +109,6 @@ export const PairRouteBody = Type.Object(
   { additionalProperties: false },
 );
 
-export const AdminKeyBody = Type.Object(
-  {
-    tenant_id: Type.Integer({ minimum: 1, maximum: 2_147_483_647 }),
-    project_name: Type.String({ minLength: 1, maxLength: 200, pattern: IDENTIFIER_PATTERN }),
-  },
-  { additionalProperties: false },
-);
-
-export const AdminKeyParams = Type.Object({
-  prefix: Type.String({
-    minLength: 4,
-    maxLength: 12,
-    pattern: '^gsk_[0-9a-f]*$',
-    description: 'The key_prefix shown when listing keys.',
-  }),
-});
-
 export const ProblemResponse = Type.Object(
   {
     type: Type.String(),
@@ -166,24 +149,6 @@ export const PairRouteResponse = Type.Object({
     description: 'Map data the answer was computed on; null when OSRM was built without one.',
   }),
 });
-
-export const IssuedKeyResponse = Type.Object({
-  key: Type.String({ description: 'Shown once. Only its digest is stored.' }),
-  tenant_id: Type.Integer(),
-  project_name: Type.String(),
-});
-
-export const KeyListResponse = Type.Array(
-  Type.Object({
-    key_prefix: Type.String(),
-    tenant_id: Type.Integer(),
-    project_name: Type.String(),
-    is_active: Type.Boolean(),
-    created_at: Type.String({ format: 'date-time' }),
-  }),
-);
-
-export const SuccessResponse = Type.Object({ success: Type.Boolean() });
 
 // No pattern: a malformed segment names nothing, so it answers 404 like any unknown one.
 const DatasetName = Type.String({ description: 'Package name, e.g. "tr-admin".' });
@@ -235,4 +200,3 @@ export const guardedResponses = {
 } as const;
 
 export const apiKeySecurity = [{ apiKey: [] }];
-export const adminSecurity = [{ adminToken: [] }];

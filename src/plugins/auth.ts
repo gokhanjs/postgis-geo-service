@@ -4,7 +4,7 @@ import { problems } from '../lib/problem.ts';
 import type { TenantContext } from '../repositories/credential.repository.ts';
 
 /**
- * Adds the two preHandlers every guarded route uses.
+ * Adds the preHandler every guarded route uses.
  *
  * authenticateApiKey resolves the calling tenant onto the request, so handlers
  * read `request.tenant` and never touch the key header themselves. The getter
@@ -35,15 +35,6 @@ export default fp(
 
       request.tenantContext = tenant;
       app.chargeTenantQuota(tenant.tenant_id);
-    });
-
-    app.decorate('authenticateAdmin', async (request: FastifyRequest) => {
-      const token = request.headers['x-admin-token'];
-      if (typeof token !== 'string' || token.length === 0) throw problems.missingAdminToken();
-
-      if (!(await app.services.credentials.isValidAdminToken(token))) {
-        throw problems.invalidAdminToken();
-      }
     });
   },
   { name: 'auth' },

@@ -20,8 +20,8 @@ the choices that script cannot make.
    - `pnpm test` passes
    - `/docs` serves the API reference
 
-4. **Report** the admin token from `pnpm generate:token` and the first API key,
-   and tell them to store the token now since only its digest is kept.
+4. **Report** the first API key from `pnpm keys issue --tenant 1 --project <name>`,
+   and tell them to store it now since only its digest is kept.
 
 If a step fails, diagnose it rather than retrying. The two failures seen most
 often are a stale volume from an older schema (`docker compose down -v`) and

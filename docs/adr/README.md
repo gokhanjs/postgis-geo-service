@@ -13,3 +13,4 @@ supersedes an old one, so the sequence stays readable as history.
 | [0005](0005-technologies-left-out.md)                | Technologies deliberately left out                     |
 | [0006](0006-tenant-views-over-row-level-security.md) | The service reads tenant data through views            |
 | [0007](0007-global-reference-datasets.md)            | Reference datasets are global files, not tenant tables |
+| [0008](0008-credentials-issued-out-of-band.md)       | API keys are issued out of band, never over HTTP       |

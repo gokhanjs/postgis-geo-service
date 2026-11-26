@@ -1,17 +1,12 @@
 import type { Pool } from 'pg';
-import { generateApiKey, hashCredential } from '../../src/lib/credentials.ts';
-
-export const ADMIN_TOKEN = 'gat_test_admin_token';
+import { generateApiKey } from '../../src/lib/credentials.ts';
 
 /** Wipes every table the suite writes to, so each test starts from a known state. */
 export async function resetDatabase(pool: Pool): Promise<void> {
-  await pool.query('TRUNCATE entity_locations, geofences, api_keys, admin_tokens');
-  await pool.query('INSERT INTO admin_tokens (token_hash) VALUES ($1)', [
-    hashCredential(ADMIN_TOKEN),
-  ]);
+  await pool.query('TRUNCATE entity_locations, geofences, api_keys');
 }
 
-/** Issues an API key bound to a tenant, mirroring what the admin endpoint does. */
+/** Issues an API key bound to a tenant, mirroring what the key CLI does. */
 export async function createApiKey(
   pool: Pool,
   tenantId: number,

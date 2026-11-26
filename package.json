@@ -1,6 +1,6 @@
 {
   "name": "postgis-geo-service",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Multi-tenant geospatial microservice for proximity search, geofencing and road routing",
   "license": "MIT",
   "engines": {
@@ -21,7 +21,7 @@
     "db:down": "docker compose down",
     "migrate": "node scripts/migrate.ts up",
     "migrate:down": "node scripts/migrate.ts down",
-    "generate:token": "node scripts/generate-token.ts"
+    "keys": "node scripts/keys.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.4.3",
